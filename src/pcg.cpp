@@ -230,8 +230,7 @@ int main(int argc, char* argv[])
         axpy(-1.0*alpha, w, z);
 
         //progress tracking
-        rr_inner = inner_product(r,r);
-        norm_r = sqrt(rr_inner);
+        norm_r = sqrt(gamma);
         res.push_back(norm_r);
 
         //set scalar last values
