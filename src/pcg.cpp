@@ -100,6 +100,23 @@ void Iinner_product(std::vector<double> a, std::vector<double>b, double* sum, MP
     MPI_Iallreduce(&sum_local, sum, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD, request);
 }
 
+/*
+ * computes (a,c) and (b,c) with a single non-blocking allreduce
+ * */
+void combined_Iinner_product(std::vector<double> a, std::vector<double>b, std::vector<double>c, double* sum, MPI_Request* request)
+{
+    double sum_local[2];
+
+    sum_local[0] = 0;
+    sum_local[1] = 0;
+    for (int i = 0; i < a.size(); i++)
+    {
+        sum_local[0] += a[i] * c[i];
+        sum_local[1] += b[i] * c[i];
+    }
+    MPI_Iallreduce(&sum_local, sum, 2, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD, request);
+}
+
 void axpy(double alpha, std::vector<double>& x, std::vector<double>& y)
 {
     for (int i = 0; i < x.size(); i++)
@@ -153,6 +170,7 @@ int main(int argc, char* argv[])
     double alpha, alpha_last;
     double beta, delta;
     double gamma, gamma_last;
+    double gamma_delta[2];
     double rr_inner;
     double norm_r, tol = 1e-6;
     int max_iter = ((int)(1.3*b.size())) + 2;
@@ -183,22 +201,19 @@ int main(int argc, char* argv[])
     {
         //non-blocking dot products
         //gamma_i = (r_i,u_i)
-        MPI_Request gamma_request;
-        //Iinner_product( r, u, &gamma, &gamma_request );
-        Iinner_product( r, r, &gamma, &gamma_request );
         //delta = (w_i, u_i)
-        MPI_Request delta_request;
-        //Iinner_product( w, u, &delta, &delta_request );
-        Iinner_product( w, r, &delta, &delta_request );
+        MPI_Request gamma_delta_request;
+        combined_Iinner_product(r,w,r,gamma_delta,&gamma_delta_request);
 
         //main computational load
         //q_i = Aw_i
         spmv(1.0, A, w, 0.0, q);
 
         //wait for dot product results
-        MPI_Wait( &gamma_request, MPI_STATUS_IGNORE );
-        MPI_Wait( &delta_request, MPI_STATUS_IGNORE );
-
+        MPI_Wait( &gamma_delta_request, MPI_STATUS_IGNORE );
+        gamma = gamma_delta[0];
+        delta = gamma_delta[1];
+     
         //scalar updates
         if(iter > 0)
         {
