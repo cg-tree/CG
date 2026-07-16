@@ -111,10 +111,10 @@ void combined_Iinner_product(std::vector<double> a, std::vector<double>b, std::v
     sum_local[0] = 0;
     sum_local[1] = 0;
     for (int i = 0; i < a.size(); i++)
-    {
         sum_local[0] += a[i] * c[i];
+    for (int i = 0; i < b.size(); i++)
         sum_local[1] += b[i] * c[i];
-    }
+    
     MPI_Iallreduce(&sum_local, sum, 2, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD, request);
 }
 
