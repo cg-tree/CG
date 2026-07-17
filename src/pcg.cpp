@@ -90,23 +90,22 @@ double inner_product(std::vector<double> a, std::vector<double> b)
     return sum;
 }
 
-void Iinner_product(std::vector<double> a, std::vector<double>b, double* sum, MPI_Request* request)
+//double sum_local[1];
+void Iinner_product(std::vector<double> a, std::vector<double>b, double* sum_local, double* sum, MPI_Request* request)
 {
-    double sum_local;
-
-    sum_local = 0;
+    *sum_local = 0;
     for (int i = 0; i < a.size(); i++)
-        sum_local += a[i] * b[i];
+        *sum_local += a[i] * b[i];
 
-    MPI_Iallreduce(&sum_local, sum, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD, request);
+    MPI_Iallreduce(sum_local, sum, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD, request);
 }
 
 /*
  * computes (a,c) and (b,c) with a single non-blocking allreduce
+ * double sum_local[2];
  * */
-void combined_Iinner_product(std::vector<double> a, std::vector<double>b, std::vector<double>c, double* sum, MPI_Request* request)
+void combined_Iinner_product(std::vector<double> a, std::vector<double>b, std::vector<double>c,double* sum_local, double* sum, MPI_Request* request)
 {
-    double sum_local[2];
 
     sum_local[0] = 0;
     sum_local[1] = 0;
@@ -115,7 +114,7 @@ void combined_Iinner_product(std::vector<double> a, std::vector<double>b, std::v
         sum_local[0] += a[i] * c[i];
         sum_local[1] += b[i] * c[i];
     }
-    MPI_Iallreduce(&sum_local, sum, 2, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD, request);
+    MPI_Iallreduce(sum_local, sum, 2, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD, request);
 }
 
 void axpy(double alpha, std::vector<double>& x, std::vector<double>& y)
@@ -172,6 +171,7 @@ int main(int argc, char* argv[])
     double beta, delta;
     double gamma, gamma_last;
     double gamma_delta[2];
+    double sum_local[2];
     double rr_inner;
     double norm_r, tol = 1e-6;
     int max_iter = ((int)(1.3*b.size())) + 2;
@@ -201,11 +201,9 @@ int main(int argc, char* argv[])
         //non-blocking dot products
         //gamma_i = (r_i,u_i)
         //delta = (w_i, u_i)
-        
-        MPI_Request gamma_request;
-        Iinner_product(r, r, &gamma, &gamma_request);
+        double tmp;
         MPI_Request gamma_delta_request;
-        combined_Iinner_product(r,w,r,gamma_delta,&gamma_delta_request);
+        combined_Iinner_product(r,w,r, sum_local, gamma_delta,&gamma_delta_request);
 
         //main computational load
         //q_i = Aw_i
@@ -213,9 +211,9 @@ int main(int argc, char* argv[])
 
         //wait for dot product results
         MPI_Wait( &gamma_delta_request, MPI_STATUS_IGNORE );
-        MPI_Wait( &gamma_request, MPI_STATUS_IGNORE );
-        if(gamma != gamma_delta[0]){
-            printf("rank %d has gamma=%f and gamma_delta[0]=%f\n",rank,gamma,gamma_delta[0]);
+        delta = inner_product(w, r);
+        if(delta != gamma_delta[1]){
+            printf("rank %d has delta=%f and gamma_delta[1]=%f\n",rank,delta,gamma_delta[1]);
         }
         gamma = gamma_delta[0];
         delta = gamma_delta[1];
