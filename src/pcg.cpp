@@ -180,11 +180,12 @@ int main(int argc, char* argv[])
     // r0 = b - A * x0
     //x0 = 0 so r0 = b
     r = b;
-    
+    MPI_Request rrinner_request;
+    Iinner_product(r,r,sum_local,&rr_inner,&rrinner_request);
     //w_0 = Ar_0
     spmv(1.0, A, r, 0.0, w);
 
-    rr_inner = inner_product(r,r);
+    MPI_Wait(&rrinner_request, MPI_STATUS_IGNORE);
     norm_r = sqrt(rr_inner);
     res.push_back(norm_r);
     // Scale tolerance by norm_r
@@ -201,7 +202,6 @@ int main(int argc, char* argv[])
         //non-blocking dot products
         //gamma_i = (r_i,u_i)
         //delta = (w_i, u_i)
-        double tmp;
         MPI_Request gamma_delta_request;
         combined_Iinner_product(r,w,r, sum_local, gamma_delta,&gamma_delta_request);
 
@@ -211,10 +211,7 @@ int main(int argc, char* argv[])
 
         //wait for dot product results
         MPI_Wait( &gamma_delta_request, MPI_STATUS_IGNORE );
-        delta = inner_product(w, r);
-        if(delta != gamma_delta[1]){
-            printf("rank %d has delta=%f and gamma_delta[1]=%f\n",rank,delta,gamma_delta[1]);
-        }
+        
         gamma = gamma_delta[0];
         delta = gamma_delta[1];
      
