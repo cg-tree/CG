@@ -179,9 +179,7 @@ int main(int argc, char* argv[])
 
     // r0 = b - A * x0
     //x0 = 0 so r0 = b
-    scale(0.0,r);
-    axpy(1.0,r,b);
-
+    r = b;
     
     //w_0 = Ar_0
     spmv(1.0, A, r, 0.0, w);
@@ -203,6 +201,9 @@ int main(int argc, char* argv[])
         //non-blocking dot products
         //gamma_i = (r_i,u_i)
         //delta = (w_i, u_i)
+        
+        MPI_Request gamma_request;
+        Iinner_product(r, r, &gamma, &gamma_request);
         MPI_Request gamma_delta_request;
         combined_Iinner_product(r,w,r,gamma_delta,&gamma_delta_request);
 
@@ -212,6 +213,10 @@ int main(int argc, char* argv[])
 
         //wait for dot product results
         MPI_Wait( &gamma_delta_request, MPI_STATUS_IGNORE );
+        MPI_Wait( &gamma_request, MPI_STATUS_IGNORE );
+        if(gamma != gamma_delta[0]){
+            printf("rank %d has gamma=%f and gamma_delta[0]=%f\n",rank,gamma,gamma_delta[0]);
+        }
         gamma = gamma_delta[0];
         delta = gamma_delta[1];
      
