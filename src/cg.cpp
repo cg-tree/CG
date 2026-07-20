@@ -1,6 +1,6 @@
 #include "sparse_mat.hpp"
 #include "par_binary_IO.hpp"
-
+#include <math.h>
 // Serial SpMV b = alpha*A*x + beta*b
 void spmv(double alpha, Mat& A, std::vector<double>& x,
         double beta, std::vector<double>& b)
