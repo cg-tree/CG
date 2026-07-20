@@ -136,6 +136,7 @@ int main(int argc, char* argv[])
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
 
+    double time_start = MPI_Wtime();
     const char* filename = "Dubcova2.pm";
     if (argc > 1)
     {
@@ -259,6 +260,8 @@ int main(int argc, char* argv[])
 
     if (rank == 0) 
     {
+        double time_end = MPI_Wtime();
+        printf("time elapsed:%f seconds\n",time_end - time_start);
         if (iter == max_iter)
             printf("Max Iterations Reached.\n");
         else
