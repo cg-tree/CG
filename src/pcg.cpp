@@ -2,6 +2,88 @@
 #include "par_binary_IO.hpp"
 #include <math.h>
 
+void spmv_row_partial(int row,int colstart,int colend, double alpha,
+        Mat& A, std::vector<double>& x,
+        double beta, std::vector<double>& b)
+{
+    double sum;
+    int start, end;
+    start = A.rowptr[row];
+    end = A.rowptr[row+1];
+    sum = 0;
+    for (int j = start; j < end; j++)
+    {
+        if((colstart <= A.col_idx[j]) && (colend > A.col_idx[j]) )
+            sum += A.data[j] * x[A.col_idx[j]];
+    }
+    b[row] = alpha * sum + beta * b[row];
+}
+
+//1 row of spmv
+void spmv_row(int row, double alpha, Mat& A, std::vector<double>& x,
+        double beta, std::vector<double>& b)
+{
+    double sum;
+    int start, end;
+    start = A.rowptr[row];
+    end = A.rowptr[row+1];
+    sum = 0;
+    for (int j = start; j < end; j++)
+    {
+        sum += A.data[j] * x[A.col_idx[j]];
+    }
+    b[row] = alpha * sum + beta * b[row];
+}
+
+//not particularly useful
+int spmv_test(int nmsgs, MPI_Request* requests, double alpha, Mat& A,
+        std::vector<double>& x, double beta, std::vector<double>& b)
+{
+    int test;
+    for (int i = 0; i < A.n_rows; i++){
+        spmv_row(i, alpha, A, x, beta, b);
+        MPI_Testall(nmsgs, requests, &test, MPI_STATUSES_IGNORE);
+    }
+    return test;
+}
+
+//call after initiating isends and irecvs
+void spmv_test(double alpha, ParMat& A, std::vector<double>& x, 
+        double beta, std::vector<double>& b, std::vector<double>& recvbuf)
+{
+    int next_request=0;
+    int nmsgs = A.recv_comm.n_msgs;
+    MPI_Request* requests = A.recv_comm.req.data();
+    for (int i = 0; i < A.on_proc.n_rows; i++){
+        int test = 0;
+        spmv_row(i, alpha, A.on_proc, x, beta, b);
+        if(next_request < nmsgs)
+            MPI_Test(&(requests[next_request]), &test, MPI_STATUS_IGNORE);
+        if(test)
+        {
+            int start,end; 
+            start = A.recv_comm.ptr[next_request];
+            end   = A.recv_comm.ptr[next_request + 1];
+            spmv_row_partial(next_request, start, end, alpha, A.off_proc, recvbuf, 1.0, b);
+            next_request++;
+        }
+    }
+    while(next_request < nmsgs)
+    {
+        int test = 0;
+        if(next_request < nmsgs)
+            MPI_Test(&(requests[next_request]), &test, MPI_STATUS_IGNORE);
+        if(test)
+        {
+            int start,end; 
+            start = A.recv_comm.ptr[next_request];
+            end   = A.recv_comm.ptr[next_request + 1];
+            spmv_row_partial(next_request, start, end, alpha, A.off_proc, recvbuf, 1.0, b);
+            next_request++;
+        }
+    }
+}
+
 // Serial SpMV b = alpha*A*x + beta*b
 void spmv(double alpha, Mat& A, std::vector<double>& x,
         double beta, std::vector<double>& b)
@@ -61,19 +143,27 @@ void spmv(double alpha, ParMat& A, std::vector<double>& x,
                   &(A.send_comm.req[i]));
     }
 
-    spmv(alpha, A.on_proc, x, beta, b);
+    //spmv(alpha, A.on_proc, x, beta, b);
+    spmv_test(alpha, A, x, beta, b, recvbuf);
+    /*int test = spmv_test(A.recv_comm.n_msgs, A.recv_comm.req.data(), alpha, A.on_proc, x, beta, b);
 
-    if (A.recv_comm.n_msgs)
+    if (test)
+    {
+        testcount++;
+        spmv(alpha, A.off_proc, recvbuf, 1.0, b);
+    }
+    else if (A.recv_comm.n_msgs)
     {
         MPI_Waitall(A.recv_comm.n_msgs, A.recv_comm.req.data(), MPI_STATUSES_IGNORE);
     }
-
+*/
     if (A.send_comm.n_msgs)
     {
         MPI_Waitall(A.send_comm.n_msgs, A.send_comm.req.data(), MPI_STATUSES_IGNORE);
     }
-
-    spmv(alpha, A.off_proc, recvbuf, 1.0, b);
+    
+    //if(!test)
+    //    spmv(alpha, A.off_proc, recvbuf, 1.0, b);
 
 }
 
