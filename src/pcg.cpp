@@ -1,7 +1,8 @@
 #include "sparse_mat.hpp"
 #include "par_binary_IO.hpp"
 #include <math.h>
-
+double total_test_time = 0;
+int total_test_count = 0;
 void spmv_row_partial(int row,int colstart,int colend, double alpha,
         Mat& A, std::vector<double>& x,
         double beta, std::vector<double>& b)
@@ -36,7 +37,7 @@ void spmv_row(int row, double alpha, Mat& A, std::vector<double>& x,
 }
 
 //not particularly useful
-int spmv_test(int nmsgs, MPI_Request* requests, double alpha, Mat& A,
+int spmv_testall(int nmsgs, MPI_Request* requests, double alpha, Mat& A,
         std::vector<double>& x, double beta, std::vector<double>& b)
 {
     int test;
@@ -47,18 +48,28 @@ int spmv_test(int nmsgs, MPI_Request* requests, double alpha, Mat& A,
     return test;
 }
 
-//call after initiating isends and irecvs
+/* call after initiating isends and irecvs
+ * tracks time spent in test calls
+ * */
 void spmv_test(double alpha, ParMat& A, std::vector<double>& x, 
         double beta, std::vector<double>& b, std::vector<double>& recvbuf)
 {
+    double time_start, time_end;
     int next_request=0;
     int nmsgs = A.recv_comm.n_msgs;
+
     MPI_Request* requests = A.recv_comm.req.data();
     for (int i = 0; i < A.on_proc.n_rows; i++){
         int test = 0;
         spmv_row(i, alpha, A.on_proc, x, beta, b);
         if(next_request < nmsgs)
+        {
+            time_start = MPI_Wtime();
             MPI_Test(&(requests[next_request]), &test, MPI_STATUS_IGNORE);
+            time_end = MPI_Wtime();
+            total_test_time += time_end - time_start;
+            total_test_count++;
+        }
         if(test)
         {
             int start,end; 
@@ -72,7 +83,13 @@ void spmv_test(double alpha, ParMat& A, std::vector<double>& x,
     {
         int test = 0;
         if(next_request < nmsgs)
+        {
+            time_start = MPI_Wtime();
             MPI_Test(&(requests[next_request]), &test, MPI_STATUS_IGNORE);
+            time_end = MPI_Wtime();
+            total_test_time += time_end - time_start;
+            total_test_count++;
+        }
         if(test)
         {
             int start,end; 
@@ -84,7 +101,7 @@ void spmv_test(double alpha, ParMat& A, std::vector<double>& x,
     }
 }
 
-// Serial SpMV b = alpha*A*x + beta*b
+// Serial SpMV b = alpha*A*x + eta*b
 void spmv(double alpha, Mat& A, std::vector<double>& x,
         double beta, std::vector<double>& b)
 {
@@ -357,6 +374,9 @@ int main(int argc, char* argv[])
         else
             printf("%d Iteration required to converge\n", iter);
         printf("2 Norm of Residual: %lg\n\n", norm_r);
+
+        printf("rank0 total_test_time:%f rank0 avg_test_time:%f\n",
+            total_test_time,total_test_time / (double) total_test_count); 
     }
 
     MPI_Finalize();
