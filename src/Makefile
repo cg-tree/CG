@@ -4,6 +4,6 @@ default:cg pcg
 cg: 
 	mpicxx cg.cpp -o cg
 pcg: 
-	mpicxx pcg.cpp -o pcg
+	mpicxx spmv.cpp pcg.cpp -v -o pcg
 clean:
 	rm cg; rm pcg

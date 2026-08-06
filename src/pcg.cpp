@@ -1,8 +1,10 @@
 #include "sparse_mat.hpp"
 #include "par_binary_IO.hpp"
+#include "spmv.hpp"
 #include <math.h>
-double total_test_time = 0;
-int total_test_count = 0;
+static double total_test_time = 0;
+static int total_test_count = 0;
+/*
 void spmv_row_partial(int row,int colstart,int colend, double alpha,
         Mat& A, std::vector<double>& x,
         double beta, std::vector<double>& b)
@@ -47,10 +49,9 @@ int spmv_testall(int nmsgs, MPI_Request* requests, double alpha, Mat& A,
     }
     return test;
 }
-
+*/
 /* call after initiating isends and irecvs
  * tracks time spent in test calls
- * */
 void spmv_test(double alpha, ParMat& A, std::vector<double>& x, 
         double beta, std::vector<double>& b, std::vector<double>& recvbuf)
 {
@@ -100,7 +101,8 @@ void spmv_test(double alpha, ParMat& A, std::vector<double>& x,
         }
     }
 }
-
+ * */
+/*
 // Serial SpMV b = alpha*A*x + eta*b
 void spmv(double alpha, Mat& A, std::vector<double>& x,
         double beta, std::vector<double>& b)
@@ -162,18 +164,7 @@ void spmv(double alpha, ParMat& A, std::vector<double>& x,
 
     //spmv(alpha, A.on_proc, x, beta, b);
     spmv_test(alpha, A, x, beta, b, recvbuf);
-    /*int test = spmv_test(A.recv_comm.n_msgs, A.recv_comm.req.data(), alpha, A.on_proc, x, beta, b);
-
-    if (test)
-    {
-        testcount++;
-        spmv(alpha, A.off_proc, recvbuf, 1.0, b);
-    }
-    else if (A.recv_comm.n_msgs)
-    {
-        MPI_Waitall(A.recv_comm.n_msgs, A.recv_comm.req.data(), MPI_STATUSES_IGNORE);
-    }
-*/
+    
     if (A.send_comm.n_msgs)
     {
         MPI_Waitall(A.send_comm.n_msgs, A.send_comm.req.data(), MPI_STATUSES_IGNORE);
@@ -183,7 +174,7 @@ void spmv(double alpha, ParMat& A, std::vector<double>& x,
     //    spmv(alpha, A.off_proc, recvbuf, 1.0, b);
 
 }
-
+*/
 double inner_product(std::vector<double> a, std::vector<double> b)
 {
     double sum, sum_local;
@@ -374,7 +365,8 @@ int main(int argc, char* argv[])
         else
             printf("%d Iteration required to converge\n", iter);
         printf("2 Norm of Residual: %lg\n\n", norm_r);
-
+        total_test_time = get_total_test_time();
+        total_test_count = get_total_test_count();
         printf("rank0 total_test_time:%f rank0 avg_test_time:%f\n",
             total_test_time,total_test_time / (double) total_test_count); 
     }
