@@ -2,8 +2,11 @@
 #include "spmv.hpp"
 #include <math.h>
 static double total_test_time = 0;
+static double sum_test_end_time = 0;
+static double sum_test_start_time = 0;
 static int total_test_count = 0;
-double get_total_test_time(){ return total_test_time;}
+double get_total_test_time(){ return sum_test_end_time - sum_test_start_time;}
+double get_naive_total_test_time(){ return total_test_time;}
 int get_total_test_count(){ return total_test_count;}
 void spmv_row_partial(int row,int colstart,int colend, double alpha,
         Mat& A, std::vector<double>& x,
@@ -67,8 +70,10 @@ void spmv_test(double alpha, ParMat& A, std::vector<double>& x,
         if(next_request < nmsgs)
         {
             time_start = MPI_Wtime();
+            sum_test_start_time += time_start;
             MPI_Test(&(requests[next_request]), &test, MPI_STATUS_IGNORE);
             time_end = MPI_Wtime();
+            sum_test_end_time += time_end;
             total_test_time += time_end - time_start;
             total_test_count++;
         }

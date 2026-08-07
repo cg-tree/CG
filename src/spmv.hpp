@@ -2,6 +2,7 @@
 #define SPMV_H
 
 double get_total_test_time();
+double get_naive_total_test_time();
 int get_total_test_count();
 // Serial SpMV b = alpha*A*x + eta*b
 void spmv(double alpha, Mat& A, std::vector<double>& x,
