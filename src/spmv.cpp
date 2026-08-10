@@ -70,10 +70,12 @@ void spmv_test(double alpha, ParMat& A, std::vector<double>& x,
         if(next_request < nmsgs)
         {
             time_start = MPI_Wtime();
-            sum_test_start_time += time_start;
             MPI_Test(&(requests[next_request]), &test, MPI_STATUS_IGNORE);
             time_end = MPI_Wtime();
+            
+            sum_test_start_time += time_start;
             sum_test_end_time += time_end;
+            
             total_test_time += time_end - time_start;
             total_test_count++;
         }
@@ -94,6 +96,10 @@ void spmv_test(double alpha, ParMat& A, std::vector<double>& x,
             time_start = MPI_Wtime();
             MPI_Test(&(requests[next_request]), &test, MPI_STATUS_IGNORE);
             time_end = MPI_Wtime();
+            
+            sum_test_start_time += time_start;
+            sum_test_end_time += time_end;
+            
             total_test_time += time_end - time_start;
             total_test_count++;
         }
@@ -107,6 +113,70 @@ void spmv_test(double alpha, ParMat& A, std::vector<double>& x,
         }
     }
 }
+/* call after initiating isends and irecvs
+ * tracks time spent in test calls
+ * checks for messages received in reverse order because we
+ * want to know to what degree the perfomance of spmv_test is
+ * due order of memory accesses
+ * */
+void spmv_test_reversed(double alpha, ParMat& A, std::vector<double>& x, 
+        double beta, std::vector<double>& b, std::vector<double>& recvbuf)
+{
+    double time_start, time_end;
+    int nmsgs = A.recv_comm.n_msgs;
+    int next_request = nmsgs - 1;
+
+    MPI_Request* requests = A.recv_comm.req.data();
+    for (int i = 0; i < A.on_proc.n_rows; i++){
+        int test = 0;
+        spmv_row(i, alpha, A.on_proc, x, beta, b);
+        if(next_request >= 0)
+        {
+            time_start = MPI_Wtime();
+            MPI_Test(&(requests[next_request]), &test, MPI_STATUS_IGNORE);
+            time_end = MPI_Wtime();
+            
+            sum_test_start_time += time_start;
+            sum_test_end_time += time_end;
+            
+            total_test_time += time_end - time_start;
+            total_test_count++;
+        }
+        if(test)
+        {
+            int start,end; 
+            start = A.recv_comm.ptr[next_request];
+            end   = A.recv_comm.ptr[next_request + 1];
+            spmv_row_partial(next_request, start, end, alpha, A.off_proc, recvbuf, 1.0, b);
+            next_request--;
+        }
+    }
+    while(next_request >= 0)
+    {
+        int test = 0;
+        if(next_request >= 0)
+        {
+            time_start = MPI_Wtime();
+            MPI_Test(&(requests[next_request]), &test, MPI_STATUS_IGNORE);
+            time_end = MPI_Wtime();
+            
+            sum_test_start_time += time_start;
+            sum_test_end_time += time_end;
+            
+            total_test_time += time_end - time_start;
+            total_test_count++;
+        }
+        if(test)
+        {
+            int start,end; 
+            start = A.recv_comm.ptr[next_request];
+            end   = A.recv_comm.ptr[next_request + 1];
+            spmv_row_partial(next_request, start, end, alpha, A.off_proc, recvbuf, 1.0, b);
+            next_request--;
+        }
+    }
+}
+
 
 // Serial SpMV b = alpha*A*x + eta*b
 void spmv(double alpha, Mat& A, std::vector<double>& x,
@@ -169,7 +239,8 @@ void spmv(double alpha, ParMat& A, std::vector<double>& x,
     }
 
     //spmv(alpha, A.on_proc, x, beta, b);
-    spmv_test(alpha, A, x, beta, b, recvbuf);
+    //spmv_test(alpha, A, x, beta, b, recvbuf);
+    spmv_test_reversed(alpha, A, x, beta, b, recvbuf);
 
     if (A.send_comm.n_msgs)
     {
