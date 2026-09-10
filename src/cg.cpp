@@ -1,8 +1,12 @@
 #include "sparse_mat.hpp"
 #include "par_binary_IO.hpp"
 #include <math.h>
+#include "spmv.hpp"
+#include "mat_ops.hpp"
+#include "icf.hpp"
+/*
 // Serial SpMV b = alpha*A*x + beta*b
-void spmv(double alpha, Mat& A, std::vector<double>& x,
+static void spmv(double alpha, Mat& A, std::vector<double>& x,
         double beta, std::vector<double>& b)
 {
     double sum;
@@ -22,7 +26,7 @@ void spmv(double alpha, Mat& A, std::vector<double>& x,
 }
 
 // Parallel SpMV b = alpha*A*x + beta*b 
-void spmv(double alpha, ParMat& A, std::vector<double>& x, 
+static void spmv(double alpha, ParMat& A, std::vector<double>& x, 
         double beta, std::vector<double>& b)
 {
     int proc, start, end;
@@ -76,7 +80,7 @@ void spmv(double alpha, ParMat& A, std::vector<double>& x,
 
 }
 
-double inner_product(std::vector<double> a, std::vector<double> b)
+static double inner_product(std::vector<double> a, std::vector<double> b)
 {
     double sum, sum_local;
 
@@ -89,18 +93,18 @@ double inner_product(std::vector<double> a, std::vector<double> b)
     return sum;
 }
 
-void axpy(double alpha, std::vector<double>& x, std::vector<double>& y)
+static void axpy(double alpha, std::vector<double>& x, std::vector<double>& y)
 {
     for (int i = 0; i < x.size(); i++)
         x[i] = x[i] + alpha*y[i];
 }
 
-void scale(double alpha, std::vector<double>& x)
+static void scale(double alpha, std::vector<double>& x)
 {
     for (int i = 0; i < x.size(); i++)
         x[i] = alpha*x[i];
 }
-
+*/
 int main(int argc, char* argv[])
 {
     MPI_Init(&argc, &argv);
@@ -130,6 +134,9 @@ int main(int argc, char* argv[])
     spmv(1.0, A, x, 0.0, b);
     std::fill(x.begin(), x.end(), 0);
 
+    
+    //cholesky
+    incomplete_cholesky(A,x,b);
     // CG Variables
     std::vector<double> r(A.local_rows);
     std::vector<double> p(A.local_rows);

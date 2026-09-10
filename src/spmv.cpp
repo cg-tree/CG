@@ -2,10 +2,10 @@
 #include "spmv.hpp"
 #include <math.h>
 static double total_test_time = 0;
-static double sum_test_end_time = 0;
-static double sum_test_start_time = 0;
+static volatile double sum_test_end_time = 0;
+static volatile double sum_test_start_time = 0;
 static int total_test_count = 0;
-double get_total_test_time(){ return sum_test_end_time - sum_test_start_time;}
+double __attribute__((optimize("O0"))) get_total_test_time(){ return sum_test_end_time - sum_test_start_time;}
 double get_naive_total_test_time(){ return total_test_time;}
 int get_total_test_count(){ return total_test_count;}
 void spmv_row_partial(int row,int colstart,int colend, double alpha,
