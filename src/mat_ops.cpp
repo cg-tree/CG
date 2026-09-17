@@ -33,9 +33,12 @@ double sparse_row_partial_inner_product(Mat& A, int rowa,int rowb,int colend )
     endb = A.rowptr[rowb+1];
     int ia = starta;
     int ib = startb;
-    if(A.col_idx[enda-1] < colend){ colend = A.col_idx[enda-1]+1; }
-    if(A.col_idx[endb-1] < colend){ colend = A.col_idx[endb-1]+1; }
-    for(;(A.col_idx[ia] < colend) && (A.col_idx[ib] < colend);)
+    
+    if(A.col_idx[enda-1] < colend){ colend = A.col_idx[enda-1]; }
+    if(A.col_idx[endb-1] < colend){ colend = A.col_idx[endb-1]; }
+    
+    for( ;(A.col_idx[ia] < colend) && (A.col_idx[ib] < colend) &&
+        (ia < enda)&&(ib < endb); )
     {
         if(A.col_idx[ia] == A.col_idx[ib])
         {
