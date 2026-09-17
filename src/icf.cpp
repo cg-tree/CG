@@ -10,6 +10,7 @@
 int test_cholesky(Mat& A, Mat& L, double tol){
 
     int errorcount = 0;
+    double errorsum = 0;
     for(int i = 0; i< A.n_rows;++i){
         int start,end;
         start = A.rowptr[i];
@@ -19,9 +20,11 @@ int test_cholesky(Mat& A, Mat& L, double tol){
             
             if( fabs(aij_approx - A.data[j]) > tol ){
                 ++errorcount;
+                errorsum += fabs(aij_approx - A.data[j]);
             }
         }
     }
+    printf("total absolute error %f\n", errorsum);
     return errorcount;
 }
 int test_mat_equals_mat(Mat& A, Mat& L){
@@ -44,39 +47,37 @@ int test_mat_equals_mat(Mat& A, Mat& L){
  * */
 double get_lii(Mat& A, Mat& L, int i)
 {
-    //printf("lii %d\n", i);
     int start,end;
     start = A.rowptr[i];
     end = A.rowptr[i+1];
     int col_idx_i = start;
     double aii;
-    //printf("start%d end%d \n",start,end);
     for(int j = start; (A.col_idx[j] <= i)&&(j < end); ++j)
     {
         aii = A.data[j];
         col_idx_i = j;
     }
-    //    printf("col_idx_i = %d\n",col_idx_i);
-    double ldotl = 0;
-    for(int k = start; k < col_idx_i; ++k){
-        ldotl += L.data[k] * L.data[k];
-    }
+    double ldotl = sparse_row_partial_inner_product(L,i,i,i);
     double lii = sqrt(aii - ldotl);
     L.data[col_idx_i] = lii;
-    //printf("lii return\n");
     return lii;
 }
 
 double get_lji(Mat& A, Mat& L, int i, int j, double lii)
 {
-    //if((i>=A.n_cols) || (j>=A.n_rows)){
-    //printf("lji i:%d j:%d\n",i,j);}
-    double lidotlj = sparse_row_partial_inner_product(L,i,j,i-1);
-    //printf("srpip \n");
-    double aij;
-    for(int k = A.rowptr[i+1] -1; (k>=A.rowptr[i]) && (A.col_idx[k]>=j); --k){ aij = A.data[k];}
-    //printf("xrpip \n");
-    return (aij - lidotlj) / lii;
+    double lidotlj = sparse_row_partial_inner_product(L,i,j,i);
+    double aji;
+    int indexji =0;
+    for(int k = A.rowptr[j];
+        (k<A.rowptr[j+1]) && (A.col_idx[k]<=i);
+        ++k)
+    {
+        indexji = k;
+    }
+    aji = A.data[indexji];
+    double lji = (aji - lidotlj) / lii;
+    L.data[lji] = lji;
+    return lji;
 }
 
 void incomplete_cholesky(Mat& A, std::vector<double>& x, std::vector<double>& b)
@@ -91,28 +92,14 @@ void incomplete_cholesky(Mat& A, std::vector<double>& x, std::vector<double>& b)
 
     if(!test_mat_equals_mat(A,l)){
         printf("mat not equals mat\n");return;}
-    for(int j = 1; j < l.n_rows; ++j)
+    for(int i = 0; i < l.n_rows; ++i)
     {
-        int start, end;
-        start = A.rowptr[j];
-        end = A.rowptr[j+1];
-    
-        double lii = get_lii(A,l,j-1);
-        for(int k = start; k < end; ++k)
+        double lii = get_lii(A,l,i);
+        for(int j = i+1; j < l.n_rows; ++j)
         {
-
-            if(A.col_idx[k]<j){
-                
-                l.data[k] = get_lji(A,l,A.col_idx[k],j,lii);
-            }
-            else if(A.col_idx[k] > j){
-                l.data[k] = 0;
-            }  
+            get_lji(A,l,i,j,lii);
         }
-        
     }
-    get_lii(A,l,l.n_rows -1);
-    //printf("safe  %d\n", A.n_rows);
 
     printf("cholesky had %d values that differed by more than tolerance\n",test_cholesky(A,l,1e-5));
 }
