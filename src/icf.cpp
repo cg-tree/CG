@@ -98,13 +98,12 @@ inline void get_lji(Mat& A, Mat& L, int i, int j, double lii)
     return;
 }
 
-void for_lji(Mat& A, Mat& L, int i, double lii){
+inline void for_lji(Mat& A, Mat& L, int i, double lii){
 
     for(int j = i+1; j < A.n_rows; ++j)
     {
         get_lji(A,L,i,j,lii);
     }
-
 }
 
 void test_incomplete_cholesky(Mat& A, std::vector<double>& x, std::vector<double>& b)
@@ -118,9 +117,6 @@ void test_incomplete_cholesky(Mat& A, std::vector<double>& x, std::vector<double
     l.n_cols= A.n_cols;
     l.nnz = A.nnz;
     double t1 = MPI_Wtime();
-    //if(!test_mat_equals_mat(A,l)){
-    //    printf("mat not equals mat\n");return;
-    //}
 
     incomplete_cholesky(A,l,x,b);//A might might not be factorizable
     double t2 = MPI_Wtime();
@@ -132,7 +128,7 @@ void test_incomplete_cholesky(Mat& A, std::vector<double>& x, std::vector<double
     printf("L factor time %fs\n", t2 - t1);
     //printf("set A=LL^T time %fs\n", t3 - t2);
 
-    //printf("cholesky had %d values that differed by more than tolerance\n",test_A_equals_LLT(A,l,1e-9));//test if factorization succeeds
+    //printf("cholesky had %d values that differed by more than tolerance\n",test_A_equals_LLT(A,l,1e-12));//test if factorization succeeds
 
 }
 void incomplete_cholesky(Mat& A, Mat& L, std::vector<double>& x, std::vector<double>& b)
