@@ -7,8 +7,19 @@
 #include "icf.hpp"
 
 
-int test_cholesky(Mat& A, Mat& L, double tol){
+int set_A_equals_LLT(Mat& A, Mat& L){
+    //set A to be LL^T because A.on_proc may be singular 
+    for(int i = 0; i< A.n_rows;++i){
+        int start,end;
+        start = A.rowptr[i];
+        end = A.rowptr[i+1];
+        for(int j=start; j< end;++j){
+            A.data[j] = sparse_row_partial_inner_product(L,i,A.col_idx[j],L.n_cols);
+        }
+    }
 
+}
+int test_A_equals_LLT(Mat& A, Mat& L, double tol){
     int errorcount = 0;
     double errorsum = 0;
     for(int i = 0; i< A.n_rows;++i){
@@ -80,7 +91,7 @@ double get_lji(Mat& A, Mat& L, int i, int j, double lii)
     return lji;
 }
 
-void incomplete_cholesky(Mat& A, std::vector<double>& x, std::vector<double>& b)
+void test_incomplete_cholesky(Mat& A, std::vector<double>& x, std::vector<double>& b)
 {
     Mat l;
     l.rowptr = std::vector<int>(A.rowptr.begin(),A.rowptr.end());
@@ -91,21 +102,31 @@ void incomplete_cholesky(Mat& A, std::vector<double>& x, std::vector<double>& b)
     l.nnz = A.nnz;
 
     if(!test_mat_equals_mat(A,l)){
-        printf("mat not equals mat\n");return;}
-    for(int i = 0; i < l.n_rows; ++i)
+        printf("mat not equals mat\n");return;
+    }
+    incomplete_cholesky(A,l,x,b);//A might might not be factorizable
+    set_A_equals_LLT(A,l);//set A to be factorizable
+    incomplete_cholesky(A,l,x,b);//compute factorization that should succeed
+
+
+    printf("cholesky had %d values that differed by more than tolerance\n",test_A_equals_LLT(A,l,1e-9));//test if factorization succeeds
+
+}
+void incomplete_cholesky(Mat& A, Mat& L, std::vector<double>& x, std::vector<double>& b)
+{
+    for(int i = 0; i < L.n_rows; ++i)
     {
-        double lii = get_lii(A,l,i);
-        for(int j = i+1; j < l.n_rows; ++j)
+        double lii = get_lii(A,L,i);
+        for(int j = i+1; j < L.n_rows; ++j)
         {
-            get_lji(A,l,i,j,lii);
+            get_lji(A,L,i,j,lii);
         }
     }
 
-    printf("cholesky had %d values that differed by more than tolerance\n",test_cholesky(A,l,1e-5));
 }
 
 void incomplete_cholesky(ParMat& A, std::vector<double>& x, std::vector<double>& b)
 {
-    incomplete_cholesky(A.on_proc, x, b);
+    test_incomplete_cholesky(A.on_proc, x, b);
 }
 
