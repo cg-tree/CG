@@ -85,14 +85,18 @@ double get_lji(Mat& A, Mat& L, int i, int j, double lii)
     {
         indexji = k;
     }
+    if(A.col_idx[indexji] != i){
+        return 0;
+    }
     aji = A.data[indexji];
     double lji = (aji - lidotlj) / lii;
-    L.data[lji] = lji;
+    L.data[indexji] = lji;
     return lji;
 }
 
 void test_incomplete_cholesky(Mat& A, std::vector<double>& x, std::vector<double>& b)
 {
+    double t0 = MPI_Wtime();
     Mat l;
     l.rowptr = std::vector<int>(A.rowptr.begin(),A.rowptr.end());
     l.col_idx = std::vector<int>(A.col_idx.begin(),A.col_idx.end());
@@ -100,28 +104,43 @@ void test_incomplete_cholesky(Mat& A, std::vector<double>& x, std::vector<double
     l.n_rows = A.n_rows;
     l.n_cols= A.n_cols;
     l.nnz = A.nnz;
+    double t1 = MPI_Wtime();
+    //if(!test_mat_equals_mat(A,l)){
+    //    printf("mat not equals mat\n");return;
+    //}
 
-    if(!test_mat_equals_mat(A,l)){
-        printf("mat not equals mat\n");return;
-    }
     incomplete_cholesky(A,l,x,b);//A might might not be factorizable
+    double t2 = MPI_Wtime();
     set_A_equals_LLT(A,l);//set A to be factorizable
+    double t3 = MPI_Wtime();
     incomplete_cholesky(A,l,x,b);//compute factorization that should succeed
-
+    double t4 = MPI_Wtime();
+    printf("L alloc time %fs\n", t1 - t0);
+    printf("L factor time %fs\n", t2 - t1);
+    printf("set A=LL^T time %fs\n", t3 - t2);
 
     printf("cholesky had %d values that differed by more than tolerance\n",test_A_equals_LLT(A,l,1e-9));//test if factorization succeeds
 
 }
 void incomplete_cholesky(Mat& A, Mat& L, std::vector<double>& x, std::vector<double>& b)
 {
+    double lii_time = 0;
+    double lji_time = 0;
+    
     for(int i = 0; i < L.n_rows; ++i)
     {
+        double t0 = MPI_Wtime();
         double lii = get_lii(A,L,i);
+        double t1 = MPI_Wtime();
+        lii_time += t1 - t0;
         for(int j = i+1; j < L.n_rows; ++j)
         {
             get_lji(A,L,i,j,lii);
         }
+        double t2 = MPI_Wtime();
+        lji_time+= t2 - t1;
     }
+    printf("lii time %fs lji time %fs\n",lii_time, lji_time);
 
 }
 
