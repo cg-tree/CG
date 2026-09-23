@@ -59,6 +59,17 @@ double sparse_row_partial_inner_product(Mat& A, int rowa,int rowb,int colend )
     return sum;
 }
 
+double sparse_row_vector_inner_product(Mat& A, int rowa, std::vector<double> x){
+    double sum = 0;
+    int start, end;
+    start = A.rowptr[rowa];
+    end = A.rowptr[rowa+1];
+    for(int i = start; i< end; ++i){
+        sum += A.data[i] * x[A.col_idx[i]];
+    }
+    return sum;
+}
+
 void axpy(double alpha, std::vector<double>& x, std::vector<double>& y)
 {
     for (int i = 0; i < x.size(); i++)
@@ -81,5 +92,58 @@ void scale(double alpha, std::vector<double>& x, int is, int ie)
 {
     for (int i = is; i < ie; i++)
         x[i] = alpha*x[i];
+}
+
+/*
+ * Solves Ly = b
+ * reference: https://courses.physics.illinois.edu/cs357/sp2020/notes/ref-9-linsys.html
+ * */
+void forward_solve(Mat& L, std::vector<double>& y, std::vector<double>& b){
+    int start,end;
+    for(int i = 0; i<L.n_rows; ++i){
+        start = L.rowptr[i];
+        end = L.rowptr[i+1];
+        double tmp = b[i];
+        double lii = 1;
+        for(int j = start; j< end; ++j){
+            int col = L.col_idx[j];
+            tmp -= L.data[j] * y[col];
+            if(i == col){
+              lii = L.data[j];
+              j = end;//exit loop
+            }
+        }
+        y[i] = tmp / lii;
+    }
+}
+
+/*
+ * Solves L^Tx = b
+ * expects: L to be lower triangular
+ * 
+ * reference: https://courses.physics.illinois.edu/cs357/sp2020/notes/ref-9-linsys.html
+ *
+ * */
+void backward_solve(Mat& L, std::vector<double>& x, std::vector<double>& b){
+    int start,end;
+    std::vector<double> tmp = b;
+    double ljj;
+    int i;
+    //auto sums = std::vector<double>(b.size(),0);
+    for(int j = L.n_rows -1; j>=0; --j){
+        start = L.rowptr[j];
+        end = L.rowptr[j+1];
+        for(i = end -1; (L.col_idx[i]>j) && (i >= start); --i){}
+        ljj = L.data[i];
+        //double tmpj = b[j] - sums[j];
+        double xj = tmp[j] / ljj;
+        //double xj = tmpj / ljj;
+        x[j] = xj;
+        for(--i; i >= start; --i){
+            int col = L.col_idx[i];
+            tmp[col] -= L.data[i] * xj;
+            //sums[col] += L.data[i] * xj;
+        }
+    }
 }
 

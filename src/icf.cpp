@@ -38,6 +38,53 @@ int test_A_equals_LLT(Mat& A, Mat& L, double tol){
     printf("total absolute error %f\n", errorsum);
     return errorcount;
 }
+
+int test_Ax_equals_b(Mat& A, std::vector<double> x, std::vector<double>b, double tol){
+    
+    int errorcount = 0;
+    double errorsum = 0;
+    double max_error = 0;
+    for(int i = 0; i< A.n_rows;++i){
+        double bi = sparse_row_vector_inner_product(A,i,x);
+        double error = fabs(bi - b[i]);
+        if( error > tol ){
+            ++errorcount;
+            errorsum += error;
+        }
+        if(error>max_error){max_error = error;}
+    }
+    printf("total absolute error %f, max error %f\n", errorsum, max_error);
+    return errorcount;
+}
+int test_LTx_equals_y(Mat& A, std::vector<double> x, std::vector<double> y, double tol){
+    auto tmp = std::vector<double>(y.size(),0);
+    int errorcount = 0;
+    double errorsum = 0;
+    double max_error = 0;
+    for(int i = 0; i< A.n_rows;++i){
+        int col = i;//bc transpose
+        double start,end;
+        start = A.rowptr[i];
+        end = A.rowptr[i+1];
+        for(int j = start; j<end; ++j){
+            int row = A.col_idx[j];//bc of transpose
+            tmp[row] += x[col]* A.data[j];
+        }
+    }
+
+    for(int i = 0; i< A.n_rows;++i){
+        double error = fabs(y[i] - tmp[i]);
+        if( error > tol ){
+            ++errorcount;
+            errorsum += error;
+        }
+        if(error>max_error){max_error = error;}
+    }
+    printf("total absolute error %f, max error %f\n", errorsum, max_error);
+    return errorcount;
+
+}
+
 int test_mat_equals_mat(Mat& A, Mat& L){
 
     int nnz = A.nnz == L.nnz;
@@ -106,32 +153,17 @@ inline void for_lji(Mat& A, Mat& L, int i, double lii){
     }
 }
 
-void test_incomplete_cholesky(Mat& A, std::vector<double>& x, std::vector<double>& b)
-{
-    double t0 = MPI_Wtime();
-    Mat l;
-    l.rowptr = std::vector<int>(A.rowptr.begin(),A.rowptr.end());
-    l.col_idx = std::vector<int>(A.col_idx.begin(),A.col_idx.end());
-    l.data = std::vector<double>(A.data.size(),0);
-    l.n_rows = A.n_rows;
-    l.n_cols= A.n_cols;
-    l.nnz = A.nnz;
-    double t1 = MPI_Wtime();
 
-    incomplete_cholesky(A,l,x,b);//A might might not be factorizable
-    double t2 = MPI_Wtime();
-    //set_A_equals_LLT(A,l);//set A to be factorizable
-    double t3 = MPI_Wtime();
-    //incomplete_cholesky(A,l,x,b);//compute factorization that should succeed
-    double t4 = MPI_Wtime();
-    printf("L alloc time %fs\n", t1 - t0);
-    printf("L factor time %fs\n", t2 - t1);
-    //printf("set A=LL^T time %fs\n", t3 - t2);
-
-    //printf("cholesky had %d values that differed by more than tolerance\n",test_A_equals_LLT(A,l,1e-12));//test if factorization succeeds
-
+void setup_L(Mat& A, Mat& L){
+    L.rowptr = std::vector<int>(A.rowptr.begin(),A.rowptr.end());
+    L.col_idx = std::vector<int>(A.col_idx.begin(),A.col_idx.end());
+    L.data = std::vector<double>(A.data.size(),0);
+    L.n_rows = A.n_rows;
+    L.n_cols= A.n_cols;
+    L.nnz = A.nnz;
 }
-void incomplete_cholesky(Mat& A, Mat& L, std::vector<double>& x, std::vector<double>& b)
+
+void incomplete_cholesky_factor(Mat& A, Mat& L)
 {
     double lii_time = 0;
     double lji_time = 0;
@@ -150,7 +182,52 @@ void incomplete_cholesky(Mat& A, Mat& L, std::vector<double>& x, std::vector<dou
 
 }
 
-void incomplete_cholesky(ParMat& A, std::vector<double>& x, std::vector<double>& b)
+void incomplete_cholesky(Mat& A, Mat& L){
+    setup_L(A,L);
+    incomplete_cholesky_factor(A,L);
+}
+void incomplete_cholesky(ParMat& A, Mat& L){ incomplete_cholesky(A.on_proc, L); }
+
+void incomplete_cholesky_solve(Mat& L, std::vector<double>& x, std::vector<double>& b){
+    auto y = std::vector<double>(x.size(),0);
+    forward_solve(L,y,b);
+    backward_solve(L,x,y);
+}
+
+void test_incomplete_cholesky(Mat& A, std::vector<double>& x, std::vector<double>& b)
+{
+    double t0 = MPI_Wtime();
+    Mat L;
+    setup_L(A,L);
+    double t1 = MPI_Wtime();
+
+    incomplete_cholesky_factor(A,L);//A might might not be factorizable
+    double t2 = MPI_Wtime();
+    set_A_equals_LLT(A,L);//set A to be factorizable
+    double t3 = MPI_Wtime();
+    //incomplete_cholesky_factor(A,L);//compute factorization that should succeed
+    double t4 = MPI_Wtime();
+    //printf("L alloc time %fs\n", t1 - t0);
+    //printf("L factor time %fs\n", t2 - t1);
+    //printf("set A=LL^T time %fs\n", t3 - t2);
+
+    printf("cholesky had %d values that differed by more than tolerance\n",test_A_equals_LLT(A,L,1e-12));//test if factorization succeeds
+    
+    //solve
+    incomplete_cholesky_solve(L,x,b);
+
+    auto y = std::vector<double>(x.size(),0);
+    forward_solve(L,y,b);
+    printf("forward solve had %d values that differed by more than tolerance\n",
+    test_Ax_equals_b(L,y,b, 1e-12));
+    backward_solve(L,x,y);
+    printf("backward solve had %d values that differed by more than tolerance\n",
+    test_LTx_equals_y(L,x,y, 1e-12));
+    //test that the solve actually works here vv
+    printf("cholesky solve had %d values that differed by more than tolerance\n",
+    test_Ax_equals_b(A,x,b, 1e-9));
+}
+void test_incomplete_cholesky(ParMat& A, std::vector<double>& x, std::vector<double>& b)
 {
     test_incomplete_cholesky(A.on_proc, x, b);
 }

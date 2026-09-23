@@ -136,7 +136,10 @@ int main(int argc, char* argv[])
 
     
     //cholesky
-    incomplete_cholesky(A,x,b);
+    Mat L;
+    //test_incomplete_cholesky(A,x,b);
+    incomplete_cholesky(A,L);
+    incomplete_cholesky_solve(L,x,b);
     // CG Variables
     std::vector<double> r(A.local_rows);
     std::vector<double> p(A.local_rows);
