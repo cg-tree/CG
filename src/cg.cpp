@@ -4,107 +4,8 @@
 #include "spmv.hpp"
 #include "mat_ops.hpp"
 #include "icf.hpp"
-/*
-// Serial SpMV b = alpha*A*x + beta*b
-static void spmv(double alpha, Mat& A, std::vector<double>& x,
-        double beta, std::vector<double>& b)
-{
-    double sum;
-    int start, end;
 
-    for (int i = 0; i < A.n_rows; i++)
-    {
-        start = A.rowptr[i];
-        end = A.rowptr[i+1];
-        sum = 0;
-        for (int j = start; j < end; j++)
-        {
-            sum += A.data[j] * x[A.col_idx[j]];
-        }
-        b[i] = alpha * sum + beta * b[i];
-    }
-}
 
-// Parallel SpMV b = alpha*A*x + beta*b 
-static void spmv(double alpha, ParMat& A, std::vector<double>& x, 
-        double beta, std::vector<double>& b)
-{
-    int proc, start, end;
-    int tag = 0;
-    std::vector<double> recvbuf(A.recv_comm.size_msgs);
-    std::vector<double> sendbuf(A.send_comm.size_msgs);
-
-    for (int i = 0; i < A.recv_comm.n_msgs; i++)
-    {
-        proc  = A.recv_comm.procs[i];
-        start = A.recv_comm.ptr[i];
-        end   = A.recv_comm.ptr[i + 1];
-        MPI_Irecv(&(recvbuf[start]),
-                  (int)(end - start),
-                  MPI_DOUBLE,
-                  proc,
-                  tag,
-                  MPI_COMM_WORLD,
-                  &(A.recv_comm.req[i]));
-    }
-
-    for (int i = 0; i < A.send_comm.n_msgs; i++)
-    {
-        proc  = A.send_comm.procs[i];
-        start = A.send_comm.ptr[i];
-        end   = A.send_comm.ptr[i + 1];
-        for (int j = start; j < end; j++)
-            sendbuf[j] = x[A.send_comm.idx[j]];
-        MPI_Isend(&(sendbuf[start]),
-                  (int)(end - start),
-                  MPI_DOUBLE,
-                  proc,
-                  tag,
-                  MPI_COMM_WORLD,
-                  &(A.send_comm.req[i]));
-    }
-
-    spmv(alpha, A.on_proc, x, beta, b);
-
-    if (A.recv_comm.n_msgs)
-    {
-        MPI_Waitall(A.recv_comm.n_msgs, A.recv_comm.req.data(), MPI_STATUSES_IGNORE);
-    }
-
-    if (A.send_comm.n_msgs)
-    {
-        MPI_Waitall(A.send_comm.n_msgs, A.send_comm.req.data(), MPI_STATUSES_IGNORE);
-    }
-
-    spmv(alpha, A.off_proc, recvbuf, 1.0, b);
-
-}
-
-static double inner_product(std::vector<double> a, std::vector<double> b)
-{
-    double sum, sum_local;
-
-    sum_local = 0;
-    for (int i = 0; i < a.size(); i++)
-        sum_local += a[i] * b[i];
-
-    MPI_Allreduce(&sum_local, &sum, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-
-    return sum;
-}
-
-static void axpy(double alpha, std::vector<double>& x, std::vector<double>& y)
-{
-    for (int i = 0; i < x.size(); i++)
-        x[i] = x[i] + alpha*y[i];
-}
-
-static void scale(double alpha, std::vector<double>& x)
-{
-    for (int i = 0; i < x.size(); i++)
-        x[i] = alpha*x[i];
-}
-*/
 int main(int argc, char* argv[])
 {
     MPI_Init(&argc, &argv);
@@ -136,10 +37,15 @@ int main(int argc, char* argv[])
 
     
     //cholesky
+#ifdef TEST
+    test_incomplete_cholesky(A,x,b);
+#endif// TEST
+#ifdef CHOLESKY
     Mat L;
-    //test_incomplete_cholesky(A,x,b);
     incomplete_cholesky(A,L);
     incomplete_cholesky_solve(L,x,b);
+#endif //CHOLESKY
+
     // CG Variables
     std::vector<double> r(A.local_rows);
     std::vector<double> p(A.local_rows);
@@ -176,6 +82,19 @@ int main(int argc, char* argv[])
     // Main CG Loop
     while (norm_r > tol && iter < max_iter)
     {
+#ifdef CHOLESKY
+        //idk ig i'll try putting this here
+double t0 = MPI_Wtime();
+//        if((iter % 16) == 0){
+          incomplete_cholesky_solve(L,p,r);
+          alpha = 1;
+          spmv(1.0, A, p, 0.0, Ap);
+//        }
+double t1 = MPI_Wtime();
+printf("solve LLTp = r %fs\n",t1 - t0);
+//        else{
+#endif //CHOLESKY
+double t2 = MPI_Wtime();
         // alpha_i = (r_i, r_i) / (A*p_i, p_i)
         spmv(1.0, A, p, 0.0, Ap);
         App_inner = inner_product(Ap, p);
@@ -185,15 +104,22 @@ int main(int argc, char* argv[])
             MPI_Abort(MPI_COMM_WORLD, -1);
         }
         alpha = rr_inner / App_inner;
-
-        axpy(alpha, x, p);
+double t3 = MPI_Wtime();
+printf("update alpha time %fs\n",t3 - t2);
+#ifdef CHOLESKY
+//        }
+#endif //CHOLESKY
 
         // x_{i+1} = x_i + alpha_i * p_i
-        if ((iter % recompute_r) && iter > 0)
+        axpy(alpha, x, p);
+
+
+        
+        if ((iter % recompute_r) && iter > 0) // don't recompute r
         {
             axpy(-1.0*alpha, r, Ap);
         }
-        else
+        else //recompute r
         {
             r = b;
             spmv(-1.0, A, x, 1.0, r);
@@ -203,6 +129,7 @@ int main(int argc, char* argv[])
         beta = next_inner / rr_inner;
 
         scale(beta, p);
+        //p_{i+1} = p_{i} + r
         axpy(1.0, p, r);
 
         // Update next inner product

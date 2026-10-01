@@ -189,9 +189,16 @@ void incomplete_cholesky(Mat& A, Mat& L){
 void incomplete_cholesky(ParMat& A, Mat& L){ incomplete_cholesky(A.on_proc, L); }
 
 void incomplete_cholesky_solve(Mat& L, std::vector<double>& x, std::vector<double>& b){
+
+    double t0 = MPI_Wtime();
     auto y = std::vector<double>(x.size(),0);
+    double t1 = MPI_Wtime();
     forward_solve(L,y,b);
+    double t2 = MPI_Wtime();
     backward_solve(L,x,y);
+    double t3 = MPI_Wtime();
+    //printf("forward solve time %fs backward solve time %fs\n",t2 - t1, t3-t2);
+
 }
 
 void test_incomplete_cholesky(Mat& A, std::vector<double>& x, std::vector<double>& b)
