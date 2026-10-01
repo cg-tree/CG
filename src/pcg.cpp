@@ -2,9 +2,11 @@
 #include "par_binary_IO.hpp"
 #include "spmv.hpp"
 #include <math.h>
+#include "icf.hpp"
+#include "mat_ops.hpp"
 static double total_test_time = 0;
 static int total_test_count = 0;
-
+/*
 double inner_product(std::vector<double> a, std::vector<double> b)
 {
     double sum, sum_local;
@@ -17,7 +19,7 @@ double inner_product(std::vector<double> a, std::vector<double> b)
 
     return sum;
 }
-
+*/
 //double sum_local[1];
 void Iinner_product(std::vector<double> a, std::vector<double>b, double* sum_local, double* sum, MPI_Request* request)
 {
@@ -44,7 +46,7 @@ void combined_Iinner_product(std::vector<double> a, std::vector<double>b, std::v
     }
     MPI_Iallreduce(sum_local, sum, 2, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD, request);
 }
-
+/*
 void axpy(double alpha, std::vector<double>& x, std::vector<double>& y)
 {
     for (int i = 0; i < x.size(); i++)
@@ -56,7 +58,7 @@ void scale(double alpha, std::vector<double>& x)
     for (int i = 0; i < x.size(); i++)
         x[i] = alpha*x[i];
 }
-
+*/
 int main(int argc, char* argv[])
 {
     MPI_Init(&argc, &argv);
@@ -92,6 +94,9 @@ int main(int argc, char* argv[])
     std::vector<double> p(A.local_rows);
     std::vector<double> z(A.local_rows);
     std::vector<double> q(A.local_rows);
+    std::vector<double> u(A.local_rows);
+    std::vector<double> m(A.local_rows);
+    std::vector<double> n(A.local_rows);
 
 
 
@@ -104,15 +109,20 @@ int main(int argc, char* argv[])
     double rr_inner;
     double norm_r, tol = 1e-6;
     int max_iter = ((int)(1.3*b.size())) + 2;
-    max_iter = 200;    
+    max_iter = 2000;    
 
     // r0 = b - A * x0
     //x0 = 0 so r0 = b
     r = b;
+    
     MPI_Request rrinner_request;
     Iinner_product(r,r,sum_local,&rr_inner,&rrinner_request);
-    //w_0 = Ar_0
-    spmv(1.0, A, r, 0.0, w);
+    Mat L;
+    incomplete_cholesky(A,L);
+    incomplete_cholesky_solve(L,u,r);
+
+    //w_0 = Au_0
+    spmv(1.0, A, u, 0.0, w);
 
     MPI_Wait(&rrinner_request, MPI_STATUS_IGNORE);
     norm_r = sqrt(rr_inner);
@@ -132,11 +142,12 @@ int main(int argc, char* argv[])
         //gamma_i = (r_i,u_i)
         //delta = (w_i, u_i)
         MPI_Request gamma_delta_request;
-        combined_Iinner_product(r,w,r, sum_local, gamma_delta,&gamma_delta_request);
+        combined_Iinner_product(r,w,u, sum_local, gamma_delta,&gamma_delta_request);
 
         //main computational load
-        //q_i = Aw_i
-        spmv(1.0, A, w, 0.0, q);
+        incomplete_cholesky_solve(L,m,w);
+        //n_i = Am_i
+        spmv(1.0, A, m, 0.0, n);
 
         //wait for dot product results
         MPI_Wait( &gamma_delta_request, MPI_STATUS_IGNORE );
@@ -157,20 +168,25 @@ int main(int argc, char* argv[])
         }
         //vector updates
         
-        //z_i = q_i + beta_i z_{i-1}
+        //z_i = n_i + beta_i z_{i-1}
         scale(beta,z);
-        axpy(1.0,z,q);
+        axpy(1.0,z,n);
+        //q_i = m_i + beta_i q_{i-1}
+        scale(beta,q);
+        axpy(1.0,q,m);
         //s_i = w_i + beta_i s_{i-1}
         scale(beta,s);
         axpy(1.0,s,w);
-        //p_i = r_i + beta_i p_{i-1}
+        //p_i = u_i + beta_i p_{i-1}
         scale(beta,p);
-        axpy(1.0,p,r);
+        axpy(1.0,p,u);
 
         //x_{i+1} = x_i + alpha_i p_i
         axpy(alpha, x, p);
         //r_{i+1} = r_i - alpha_i s_i
         axpy(-1.0*alpha, r, s);
+        //u_{i+1} = u_i - alpha_i q_i
+        axpy(-1.0*alpha, u, q);
         //w_{i+1} = w_i - alpha_i z_i
         axpy(-1.0*alpha, w, z);
 

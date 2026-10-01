@@ -36,24 +36,18 @@ int main(int argc, char* argv[])
     std::fill(x.begin(), x.end(), 0);
 
     
-    //cholesky
 #ifdef TEST
     test_incomplete_cholesky(A,x,b);
 #endif// TEST
-#ifdef CHOLESKY
-    Mat L;
-    incomplete_cholesky(A,L);
-    incomplete_cholesky_solve(L,x,b);
-#endif //CHOLESKY
-
     // CG Variables
     std::vector<double> r(A.local_rows);
+    std::vector<double> z(A.local_rows);
     std::vector<double> p(A.local_rows);
     std::vector<double> Ap(A.local_rows);
 
     int iter, recompute_r;
     double alpha, beta;
-    double rr_inner, next_inner, App_inner;
+    double rz_inner, next_inner, App_inner;
     double norm_r, tol = 1e-6;
     int max_iter = ((int)(1.3*b.size())) + 2;
 
@@ -61,12 +55,16 @@ int main(int argc, char* argv[])
     r = b;
     spmv(-1.0, A, x, 1.0, r);
 
-    // p0 = r0
-    p = r;
+    Mat L;
+    incomplete_cholesky(A,L);
+    incomplete_cholesky_solve(L,z,r);
+
+    // p0 = z0
+    p = z;
 
     // Find initial (r, r) and residual
-    rr_inner = inner_product(r, r);
-    norm_r = sqrt(rr_inner);
+    rz_inner = inner_product(r, z);
+    norm_r = sqrt(rz_inner);
     res.push_back(norm_r);
 
     // Scale tolerance by norm_r
@@ -82,19 +80,7 @@ int main(int argc, char* argv[])
     // Main CG Loop
     while (norm_r > tol && iter < max_iter)
     {
-#ifdef CHOLESKY
-        //idk ig i'll try putting this here
-double t0 = MPI_Wtime();
-//        if((iter % 16) == 0){
-          incomplete_cholesky_solve(L,p,r);
-          alpha = 1;
-          spmv(1.0, A, p, 0.0, Ap);
-//        }
-double t1 = MPI_Wtime();
-printf("solve LLTp = r %fs\n",t1 - t0);
-//        else{
-#endif //CHOLESKY
-double t2 = MPI_Wtime();
+        double t2 = MPI_Wtime();
         // alpha_i = (r_i, r_i) / (A*p_i, p_i)
         spmv(1.0, A, p, 0.0, Ap);
         App_inner = inner_product(Ap, p);
@@ -103,16 +89,12 @@ double t2 = MPI_Wtime();
             printf("Indefinite matrix detected in CG! Aborting...\n");
             MPI_Abort(MPI_COMM_WORLD, -1);
         }
-        alpha = rr_inner / App_inner;
-double t3 = MPI_Wtime();
-printf("update alpha time %fs\n",t3 - t2);
-#ifdef CHOLESKY
-//        }
-#endif //CHOLESKY
+        alpha = rz_inner / App_inner;
+        double t3 = MPI_Wtime();
+        printf("update alpha time %fs\n",t3 - t2);
 
         // x_{i+1} = x_i + alpha_i * p_i
         axpy(alpha, x, p);
-
 
         
         if ((iter % recompute_r) && iter > 0) // don't recompute r
@@ -125,16 +107,18 @@ printf("update alpha time %fs\n",t3 - t2);
             spmv(-1.0, A, x, 1.0, r);
         }
 
-        next_inner = inner_product(r, r);
-        beta = next_inner / rr_inner;
+        incomplete_cholesky_solve(L,z,r);
+
+        next_inner = inner_product(r, z);
+        beta = next_inner / rz_inner;
 
         scale(beta, p);
-        //p_{i+1} = p_{i} + r
-        axpy(1.0, p, r);
+        //p_{i+1} = p_{i} + z_{i+1}
+        axpy(1.0, p, z);
 
         // Update next inner product
-        rr_inner = next_inner;
-        norm_r = sqrt(rr_inner);
+        rz_inner = next_inner;
+        norm_r = sqrt(rz_inner);
 
         res.push_back(norm_r);
 
