@@ -4,7 +4,7 @@
 #include "spmv.hpp"
 #include "mat_ops.hpp"
 #include "icf.hpp"
-
+#include "cg.hpp"
 
 int main(int argc, char* argv[])
 {
@@ -13,7 +13,6 @@ int main(int argc, char* argv[])
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
     
-    double time_start = MPI_Wtime();
 
     const char* filename = "Dubcova2.pm";
     if (argc > 1)
@@ -24,9 +23,9 @@ int main(int argc, char* argv[])
     ParMat A;
     readParMatrix(filename, A);
     form_comm(A);
+
     std::vector<double> x(A.local_cols);
     std::vector<double> b(A.local_rows);
-    std::vector<double> res;
 
     // Set b to random values, x to 0
     srand(time(NULL) + rank);
@@ -34,11 +33,19 @@ int main(int argc, char* argv[])
             [&](){ return (double)(rand()) / RAND_MAX; });
     spmv(1.0, A, x, 0.0, b);
     std::fill(x.begin(), x.end(), 0);
+    return preconditioned_cg(A,x,b);
+}
+int preconditioned_cg(ParMat A, std::vector<double>x, std::vector<double>b){
 
+    int rank, num_procs;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
+    std::vector<double> res;
+    double time_start = MPI_Wtime();
     
-#ifdef TEST
+    #ifdef TEST
     test_incomplete_cholesky(A,x,b);
-#endif// TEST
+    #endif// TEST
     // CG Variables
     std::vector<double> r(A.local_rows);
     std::vector<double> z(A.local_rows);
@@ -91,7 +98,7 @@ int main(int argc, char* argv[])
         }
         alpha = rz_inner / App_inner;
         double t3 = MPI_Wtime();
-        printf("update alpha time %fs\n",t3 - t2);
+        //printf("update alpha time %fs\n",t3 - t2);
 
         // x_{i+1} = x_i + alpha_i * p_i
         axpy(alpha, x, p);
