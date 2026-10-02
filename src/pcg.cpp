@@ -6,20 +6,7 @@
 #include "mat_ops.hpp"
 static double total_test_time = 0;
 static int total_test_count = 0;
-/*
-double inner_product(std::vector<double> a, std::vector<double> b)
-{
-    double sum, sum_local;
 
-    sum_local = 0;
-    for (int i = 0; i < a.size(); i++)
-        sum_local += a[i] * b[i];
-
-    MPI_Allreduce(&sum_local, &sum, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-
-    return sum;
-}
-*/
 //double sum_local[1];
 void Iinner_product(std::vector<double> a, std::vector<double>b, double* sum_local, double* sum, MPI_Request* request)
 {
@@ -46,19 +33,8 @@ void combined_Iinner_product(std::vector<double> a, std::vector<double>b, std::v
     }
     MPI_Iallreduce(sum_local, sum, 2, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD, request);
 }
-/*
-void axpy(double alpha, std::vector<double>& x, std::vector<double>& y)
-{
-    for (int i = 0; i < x.size(); i++)
-        x[i] = x[i] + alpha*y[i];
-}
 
-void scale(double alpha, std::vector<double>& x)
-{
-    for (int i = 0; i < x.size(); i++)
-        x[i] = alpha*x[i];
-}
-*/
+
 int main(int argc, char* argv[])
 {
     MPI_Init(&argc, &argv);
