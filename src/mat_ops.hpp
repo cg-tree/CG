@@ -4,6 +4,9 @@ double inner_product(std::vector<double> a, std::vector<double> b);
 double inner_product(std::vector<double> a, std::vector<double>b, int is, int ie);
 double sparse_row_partial_inner_product(Mat& A, int rowa,int rowb,int colend );
 double sparse_row_vector_inner_product(Mat& A, int rowa, std::vector<double> x);
+
+void Iinner_product(std::vector<double> a, std::vector<double>b, double* sum_local, double* sum, MPI_Request* request);
+void combined_Iinner_product(std::vector<double> a, std::vector<double>b, std::vector<double>c,double* sum_local, double* sum, MPI_Request* request);
 void axpy(double alpha, std::vector<double>& x, std::vector<double>& y);
 void axpy(double alpha, std::vector<double>& x, std::vector<double>& y, int is, int ie);
 void scale(double alpha, std::vector<double>& x);

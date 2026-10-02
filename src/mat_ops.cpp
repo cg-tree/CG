@@ -69,6 +69,33 @@ double sparse_row_vector_inner_product(Mat& A, int rowa, std::vector<double> x){
     }
     return sum;
 }
+//double sum_local[1];
+void Iinner_product(std::vector<double> a, std::vector<double>b, double* sum_local, double* sum, MPI_Request* request)
+{
+    *sum_local = 0;
+    for (int i = 0; i < a.size(); i++)
+        *sum_local += a[i] * b[i];
+
+    MPI_Iallreduce(sum_local, sum, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD, request);
+}
+
+/*
+ * computes (a,c) and (b,c) with a single non-blocking allreduce
+ * double sum_local[2];
+ * */
+void combined_Iinner_product(std::vector<double> a, std::vector<double>b, std::vector<double>c,double* sum_local, double* sum, MPI_Request* request)
+{
+
+    sum_local[0] = 0;
+    sum_local[1] = 0;
+    for (int i = 0; i < a.size(); i++)
+    {
+        sum_local[0] += a[i] * c[i];
+        sum_local[1] += b[i] * c[i];
+    }
+    MPI_Iallreduce(sum_local, sum, 2, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD, request);
+}
+
 
 void axpy(double alpha, std::vector<double>& x, std::vector<double>& y)
 {

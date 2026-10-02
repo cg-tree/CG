@@ -6,7 +6,7 @@
 #include "mat_ops.hpp"
 static double total_test_time = 0;
 static int total_test_count = 0;
-
+/*
 //double sum_local[1];
 void Iinner_product(std::vector<double> a, std::vector<double>b, double* sum_local, double* sum, MPI_Request* request)
 {
@@ -17,10 +17,10 @@ void Iinner_product(std::vector<double> a, std::vector<double>b, double* sum_loc
     MPI_Iallreduce(sum_local, sum, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD, request);
 }
 
-/*
+/ *
  * computes (a,c) and (b,c) with a single non-blocking allreduce
  * double sum_local[2];
- * */
+ * * /
 void combined_Iinner_product(std::vector<double> a, std::vector<double>b, std::vector<double>c,double* sum_local, double* sum, MPI_Request* request)
 {
 
@@ -33,7 +33,7 @@ void combined_Iinner_product(std::vector<double> a, std::vector<double>b, std::v
     }
     MPI_Iallreduce(sum_local, sum, 2, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD, request);
 }
-
+*/
 
 int main(int argc, char* argv[])
 {
