@@ -1,13 +1,19 @@
 #include "sparse_mat.hpp"
 #include "spmv.hpp"
+#include "comm/comm_routines.hpp"
+#include <functional>
 #include <math.h>
 static double total_test_time = 0;
 static volatile double sum_test_end_time = 0;
 static volatile double sum_test_start_time = 0;
 static int total_test_count = 0;
-double __attribute__((optimize("O0"))) get_total_test_time(){ return sum_test_end_time - sum_test_start_time;}
+
+double get_total_test_time(){ return sum_test_end_time - sum_test_start_time;}
+
 double get_naive_total_test_time(){ return total_test_time;}
+
 int get_total_test_count(){ return total_test_count;}
+
 void spmv_row_partial(int row,int colstart,int colend, double alpha,
         Mat& A, std::vector<double>& x,
         double beta, std::vector<double>& b)
@@ -25,7 +31,7 @@ void spmv_row_partial(int row,int colstart,int colend, double alpha,
     b[row] = alpha * sum + beta * b[row];
 }
 
-//1 row of spmv
+//1 row of spmv for A.on_proc
 void spmv_row(int row, double alpha, Mat& A, std::vector<double>& x,
         double beta, std::vector<double>& b)
 {
@@ -178,7 +184,7 @@ void spmv_test_reversed(double alpha, ParMat& A, std::vector<double>& x,
 }
 
 
-// Serial SpMV b = alpha*A*x + eta*b
+// Serial SpMV b = alpha*A*x + beta*b
 void spmv(double alpha, Mat& A, std::vector<double>& x,
         double beta, std::vector<double>& b)
 {
@@ -239,8 +245,8 @@ void spmv(double alpha, ParMat& A, std::vector<double>& x,
     }
 
     //spmv(alpha, A.on_proc, x, beta, b);
-    //spmv_test(alpha, A, x, beta, b, recvbuf);
-    spmv_test_reversed(alpha, A, x, beta, b, recvbuf);
+    spmv_test(alpha, A, x, beta, b, recvbuf);
+    //spmv_test_reversed(alpha, A, x, beta, b, recvbuf);
 
     if (A.send_comm.n_msgs)
     {
@@ -250,3 +256,47 @@ void spmv(double alpha, ParMat& A, std::vector<double>& x,
 }
 
 
+// Serial SpMV
+void spmv(double alpha, Mat& A, double* x, double beta, double* b)
+{
+    double sum;
+    int start, end;
+
+    for (int i = 0; i < A.n_rows; i++)
+    {
+        start = A.rowptr[i];
+        end   = A.rowptr[i + 1];
+        sum   = 0;
+        for (int j = start; j < end; j++)
+        {
+            sum += A.data[j] * x[A.col_idx[j]];
+        }
+        b[i] = alpha * sum + beta * b[i];
+    }
+}
+
+// Standard Parallel SpMV
+void spmv_standard(double alpha,
+          ParMat& A,
+          std::vector<double>& x,
+          double beta,
+          std::vector<double>& b,
+          SpMVComm* comm)
+{
+    int proc, start, end;
+    int tag = 0;
+
+    comm->pack(x);
+
+    comm->start();
+
+    spmv(alpha, A.on_proc, x.data(), beta, b.data());
+
+    comm->wait();
+
+    spmv(alpha, A.off_proc, comm->get_recvbuf(), 1.0, b.data());
+}
+
+std::function<void(double,ParMat&,std::vector<double>&,double,std::vector<double>&,SpMVComm*)> get_spmv(SPMV_TYPE SPMV){  
+    return spmv_standard;
+}

@@ -4,9 +4,10 @@
 #include "par_binary_IO.hpp"
 #include "sparse_mat.hpp"
 #include "comm/comm_routines.hpp"
-
+#include "spmv.hpp"
+#include "mat_ops.hpp"
 #include <cmath>
-
+/*
 void spmv(double alpha, Mat& A, double* x, double beta, double* b);
 void spmv(double alpha,
           ParMat& A,
@@ -20,6 +21,7 @@ double inner_product(std::vector<double>& a,
                      std::vector<double>& b,
                      AllreduceComm* comm);
 
+          */
 
 template <typename SComm, typename AComm>
 int CG(ParMat& A, 
@@ -41,7 +43,8 @@ int CG(ParMat& A,
 
     // Setup persistent allreduces
     double local_sum, global_sum;
-
+    SPMV_TYPE spmv_type = STANDARD;
+    auto spmv = get_spmv(spmv_type);
     SpMVComm* spmv_comm = new SComm();
     AllreduceComm* allreduce_comm = new AComm();
 

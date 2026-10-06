@@ -1,5 +1,9 @@
 #ifndef MAT_OPS_HPP
 #define MAT_OPS_HPP
+#include "comm/comm_routines.hpp"
+double inner_product(std::vector<double>& a,
+                     std::vector<double>& b,
+                     AllreduceComm* comm);
 double inner_product(std::vector<double> a, std::vector<double> b);
 double inner_product(std::vector<double> a, std::vector<double>b, int is, int ie);
 double sparse_row_partial_inner_product(Mat& A, int rowa,int rowb,int colend );

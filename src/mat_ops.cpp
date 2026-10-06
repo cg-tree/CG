@@ -1,6 +1,28 @@
 #include <vector>
 #include "sparse_mat.hpp"
+#include "comm/comm_routines.hpp"
 #include "mat_ops.hpp"
+// Parallel Inner Product
+double inner_product(std::vector<double>& a,
+                     std::vector<double>& b,
+                     AllreduceComm* comm)
+{
+    double local_sum = 0;
+    for (int i = 0; i < a.size(); i++)
+    {
+        local_sum += a[i] * b[i];
+    }
+    comm->set_local_sum(local_sum);
+
+    comm->start();
+
+    comm->wait();
+
+    return comm->get_global_sum();
+}
+
+
+
 double inner_product(std::vector<double> a, std::vector<double> b)
 {
     double sum, sum_local;
