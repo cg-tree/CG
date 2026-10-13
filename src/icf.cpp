@@ -178,7 +178,7 @@ void incomplete_cholesky_factor(Mat& A, Mat& L)
         double t2 = MPI_Wtime();
         lji_time+= t2 - t1;
     }
-    printf("lii time %fs lji time %fs\n",lii_time, lji_time);
+    //printf("lii time %fs lji time %fs\n",lii_time, lji_time);
 
 }
 

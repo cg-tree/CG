@@ -4,36 +4,9 @@
 #include <math.h>
 #include "icf.hpp"
 #include "mat_ops.hpp"
+#include "pcg.hpp"
 static double total_test_time = 0;
 static int total_test_count = 0;
-/*
-//double sum_local[1];
-void Iinner_product(std::vector<double> a, std::vector<double>b, double* sum_local, double* sum, MPI_Request* request)
-{
-    *sum_local = 0;
-    for (int i = 0; i < a.size(); i++)
-        *sum_local += a[i] * b[i];
-
-    MPI_Iallreduce(sum_local, sum, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD, request);
-}
-
-/ *
- * computes (a,c) and (b,c) with a single non-blocking allreduce
- * double sum_local[2];
- * * /
-void combined_Iinner_product(std::vector<double> a, std::vector<double>b, std::vector<double>c,double* sum_local, double* sum, MPI_Request* request)
-{
-
-    sum_local[0] = 0;
-    sum_local[1] = 0;
-    for (int i = 0; i < a.size(); i++)
-    {
-        sum_local[0] += a[i] * c[i];
-        sum_local[1] += b[i] * c[i];
-    }
-    MPI_Iallreduce(sum_local, sum, 2, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD, request);
-}
-*/
 
 int main(int argc, char* argv[])
 {
@@ -42,7 +15,6 @@ int main(int argc, char* argv[])
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
 
-    double time_start = MPI_Wtime();
     const char* filename = "Dubcova2.pm";
     if (argc > 1)
     {
@@ -54,7 +26,6 @@ int main(int argc, char* argv[])
     form_comm(A);
     std::vector<double> x(A.local_cols);
     std::vector<double> b(A.local_rows);
-    std::vector<double> res;
 
     // Set b to random values, x to 0
     srand(time(NULL) + rank);
@@ -63,6 +34,14 @@ int main(int argc, char* argv[])
     spmv(1.0, A, x, 0.0, b);
     std::fill(x.begin(), x.end(), 0);
 
+    return preconditioned_pipe_cg(A, x, b);
+}
+int preconditioned_pipe_cg(ParMat A, std::vector<double> x, std::vector<double> b){
+    int rank, num_procs;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
+    double time_start = MPI_Wtime();
+    std::vector<double> res;
     // CG Variables
     std::vector<double> r(A.local_rows);
     std::vector<double> w(A.local_rows);
@@ -91,10 +70,14 @@ int main(int argc, char* argv[])
     //x0 = 0 so r0 = b
     r = b;
     
-    MPI_Request rrinner_request;
-    Iinner_product(r,r,sum_local,&rr_inner,&rrinner_request);
     Mat L;
     incomplete_cholesky(A,L);
+    incomplete_cholesky_solve(L,x,b);
+
+    // r0 = b - A * x0
+    spmv(-1.0, A, x, 0.0, r);
+    MPI_Request rrinner_request;
+    Iinner_product(r,r,sum_local,&rr_inner,&rrinner_request);
     incomplete_cholesky_solve(L,u,r);
 
     //w_0 = Au_0
