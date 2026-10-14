@@ -117,7 +117,7 @@ int preconditioned_cg(SPMV_TYPE spmv_type, INNER_PRODUCT_TYPE inner_product_type
 
         iter++;
     }
-
+    /*
     if (rank == 0) 
     {
         double time_end = MPI_Wtime();
@@ -127,8 +127,8 @@ int preconditioned_cg(SPMV_TYPE spmv_type, INNER_PRODUCT_TYPE inner_product_type
         else
             printf("%d Iteration required to converge\n", iter);
         printf("2 Norm of Residual: %lg\n\n", norm_r);
-    }
-
+    }*/
+    return iter;
 }
 
 int standard_cg(SPMV_TYPE spmv_type, INNER_PRODUCT_TYPE inner_product_type, ParMat& A, 
@@ -369,7 +369,7 @@ int pipe_cg(SPMV_TYPE spmv_type, INNER_PRODUCT_TYPE inner_product_type, ParMat& 
         iter++;
         //end
     }
-
+/*   
     if (rank == 0) 
     {
         double time_end = MPI_Wtime();
@@ -379,7 +379,7 @@ int pipe_cg(SPMV_TYPE spmv_type, INNER_PRODUCT_TYPE inner_product_type, ParMat& 
         else
             printf("%d Iteration required to converge\n", iter);
         printf("2 Norm of Residual: %lg\n\n", norm_r);
-        double total_test_time = get_total_test_time();
+     double total_test_time = get_total_test_time();
         double total_naive_test_time = get_naive_total_test_time();
         int total_test_count = get_total_test_count();
         printf("rank0 total_test_time:%f rank0 avg_test_time:%f\n",
@@ -387,7 +387,8 @@ int pipe_cg(SPMV_TYPE spmv_type, INNER_PRODUCT_TYPE inner_product_type, ParMat& 
         printf("rank0 total_test_time:%f total_naive_test_time:%f %fs not counted due to catastrophic loss of precision\n",
             total_test_time, total_naive_test_time, total_test_time - total_naive_test_time);
     }
-
+    */
+    return iter;
 }
 
 
