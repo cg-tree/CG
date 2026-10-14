@@ -1,4 +1,4 @@
-default:cg pcg
+default:cg benchmark_cg
 	echo ":)"
 
 cg: 
@@ -8,7 +8,7 @@ cg:
 		icf.cpp\
 		benchmark_cg_mpi.cpp\
 		-o cg
-pcg: 
-	mpicxx -O3 spmv.cpp pcg.cpp mat_ops.cpp icf.cpp -o pcg
+benchmark_cg: 
+	mpicxx -O3 spmv.cpp mat_ops.cpp icf.cpp cg_routines.cpp benchmark_cg.cpp -o benchmark_cg
 clean:
-	rm cg; rm pcg
+	rm cg; rm benchmark_cg

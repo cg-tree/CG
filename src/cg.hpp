@@ -43,8 +43,8 @@ int CG(ParMat& A,
 
     // Setup persistent allreduces
     double local_sum, global_sum;
-    SPMV_TYPE spmv_type = PIPE_SPMV;
-    auto spmv = get_spmv(spmv_type);
+    auto spmv = get_spmv_advance(STANDARD_SPMV);
+    auto inner_product= get_inner_product_advance();
     SpMVComm* spmv_comm = new SComm();
     AllreduceComm* allreduce_comm = new AComm();
 

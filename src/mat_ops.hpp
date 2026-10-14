@@ -1,6 +1,30 @@
 #ifndef MAT_OPS_HPP
 #define MAT_OPS_HPP
 #include "comm/comm_routines.hpp"
+#include <functional>
+
+enum INNER_PRODUCT_TYPE{
+    STANDARD_INNER_PRODUCT,
+    NON_BLOCKING_INNER_PRODUCT
+};
+
+std::function<void(std::vector<double>,
+    std::vector<double>,
+    double*,
+    double*,
+    MPI_Request*)> get_inner_product(INNER_PRODUCT_TYPE inner_product_type);
+    
+std::function<void(std::vector<double>,
+    std::vector<double>,
+    std::vector<double>,
+    double*,
+    double*,
+    MPI_Request*)> get_combined_inner_product(INNER_PRODUCT_TYPE inner_product_type);
+
+std::function<double(std::vector<double>&, std::vector<double>&, AllreduceComm*)> get_inner_product_advance();
+
+std::function<void(MPI_Request*, MPI_Status*)> get_inner_product_wait(INNER_PRODUCT_TYPE inner_product_type);
+
 double inner_product(std::vector<double>& a,
                      std::vector<double>& b,
                      AllreduceComm* comm);

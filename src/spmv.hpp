@@ -18,6 +18,7 @@ enum SPMV_TYPE{
   PIPE_SPMV
 };
 
-std::function<void(double,ParMat&,std::vector<double>&,double,std::vector<double>&,SpMVComm*)> get_spmv(SPMV_TYPE SPMV);
+std::function<void(double,ParMat&,std::vector<double>&,double,std::vector<double>&)> get_spmv(SPMV_TYPE spmv_type);
+std::function<void(double,ParMat&,std::vector<double>&,double,std::vector<double>&,SpMVComm*)> get_spmv_advance(SPMV_TYPE SPMV);
 
 #endif //SPMV_H

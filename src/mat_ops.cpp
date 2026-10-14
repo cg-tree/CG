@@ -3,7 +3,7 @@
 #include "comm/comm_routines.hpp"
 #include "mat_ops.hpp"
 // Parallel Inner Product
-double inner_product(std::vector<double>& a,
+double inner_product_advance(std::vector<double>& a,
                      std::vector<double>& b,
                      AllreduceComm* comm)
 {
@@ -23,6 +23,7 @@ double inner_product(std::vector<double>& a,
 
 
 
+// Parallel Inner Product
 double inner_product(std::vector<double> a, std::vector<double> b)
 {
     double sum, sum_local;
@@ -36,6 +37,7 @@ double inner_product(std::vector<double> a, std::vector<double> b)
     return sum;
 }
 
+// Serial Inner Product
 double inner_product(std::vector<double> a, std::vector<double>b, int is, int ie)
 {
     
@@ -45,6 +47,7 @@ double inner_product(std::vector<double> a, std::vector<double>b, int is, int ie
     return sum_local;
 }
 
+// inner product of two rows of a sparse matrix
 double sparse_row_partial_inner_product(Mat& A, int rowa,int rowb,int colend )
 {
     double sum = 0;
@@ -81,6 +84,7 @@ double sparse_row_partial_inner_product(Mat& A, int rowa,int rowb,int colend )
     return sum;
 }
 
+// innerproduct of row of sparse matrix with a vector
 double sparse_row_vector_inner_product(Mat& A, int rowa, std::vector<double> x){
     double sum = 0;
     int start, end;
@@ -91,6 +95,8 @@ double sparse_row_vector_inner_product(Mat& A, int rowa, std::vector<double> x){
     }
     return sum;
 }
+
+// non-blocking inner product
 //double sum_local[1];
 void Iinner_product(std::vector<double> a, std::vector<double>b, double* sum_local, double* sum, MPI_Request* request)
 {
@@ -118,6 +124,60 @@ void combined_Iinner_product(std::vector<double> a, std::vector<double>b, std::v
     MPI_Iallreduce(sum_local, sum, 2, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD, request);
 }
 
+std::function<void(std::vector<double>,
+    std::vector<double>,
+    double*,
+    double*,
+    MPI_Request*)> get_inner_product(INNER_PRODUCT_TYPE inner_product_type){
+    
+    switch(inner_product_type){
+        case STANDARD_INNER_PRODUCT:
+            return [](std::vector<double> a,
+                std::vector<double>b,
+                double* sum_local,
+                double* sum,
+                MPI_Request* request){
+                    *sum_local = inner_product(a,b);
+            };
+        case NON_BLOCKING_INNER_PRODUCT:
+            return Iinner_product;
+    };
+}
+
+std::function<void(std::vector<double>,
+    std::vector<double>,
+    std::vector<double>,
+    double*,
+    double*,
+    MPI_Request*)> get_combined_inner_product(INNER_PRODUCT_TYPE inner_product_type){
+    switch(inner_product_type){
+        case STANDARD_INNER_PRODUCT:
+            return [](std::vector<double> a,
+                std::vector<double>b,
+                std::vector<double>c,
+                double* sum_local,
+                double* sum,
+                MPI_Request* request){
+                    combined_Iinner_product(a,b,c,sum_local,sum,request);
+                    MPI_Wait(request, MPI_STATUS_IGNORE);
+            };
+        case NON_BLOCKING_INNER_PRODUCT:
+            return combined_Iinner_product;
+    };
+}
+
+std::function<void(MPI_Request*, MPI_Status*)> get_inner_product_wait(INNER_PRODUCT_TYPE inner_product_type){
+    switch(inner_product_type){
+        case STANDARD_INNER_PRODUCT:
+            return [](MPI_Request* request, MPI_Status* status){return;};
+        case NON_BLOCKING_INNER_PRODUCT:
+            return MPI_Wait;
+    }
+}
+
+std::function<double(std::vector<double>&, std::vector<double>&, AllreduceComm*)> get_inner_product_advance(){
+    return inner_product_advance;
+}
 
 void axpy(double alpha, std::vector<double>& x, std::vector<double>& y)
 {

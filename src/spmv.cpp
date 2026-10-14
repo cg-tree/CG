@@ -227,9 +227,8 @@ void spmv(double alpha, Mat& A, std::vector<double>& x,
     }
 }
 
-// Parallel SpMV b = alpha*A*x + beta*b
-// optimized spmv1
-void spmv_test(double alpha, ParMat& A, std::vector<double>& x, 
+// Parallel SpMV b = alpha*A*x + beta*b 
+void spmv_basic(double alpha, ParMat& A, std::vector<double>& x, 
         double beta, std::vector<double>& b)
 {
     int proc, start, end;
@@ -267,9 +266,63 @@ void spmv_test(double alpha, ParMat& A, std::vector<double>& x,
                   &(A.send_comm.req[i]));
     }
 
-    //spmv(alpha, A.on_proc, x, beta, b);
+    spmv(alpha, A.on_proc, x, beta, b);
+
+    if (A.recv_comm.n_msgs)
+    {
+        MPI_Waitall(A.recv_comm.n_msgs, A.recv_comm.req.data(), MPI_STATUSES_IGNORE);
+    }
+
+    if (A.send_comm.n_msgs)
+    {
+        MPI_Waitall(A.send_comm.n_msgs, A.send_comm.req.data(), MPI_STATUSES_IGNORE);
+    }
+
+    spmv(alpha, A.off_proc, recvbuf, 1.0, b);
+
+}
+
+// Parallel SpMV b = alpha*A*x + beta*b
+// optimized spmv1
+void pipe_spmv(double alpha, ParMat& A, std::vector<double>& x, 
+        double beta, std::vector<double>& b)
+{
+    int proc, start, end;
+    int tag = 0;
+    std::vector<double> recvbuf(A.recv_comm.size_msgs);
+    std::vector<double> sendbuf(A.send_comm.size_msgs);
+
+    for (int i = 0; i < A.recv_comm.n_msgs; i++)
+    {
+        proc  = A.recv_comm.procs[i];
+        start = A.recv_comm.ptr[i];
+        end   = A.recv_comm.ptr[i + 1];
+        MPI_Irecv(&(recvbuf[start]),
+                  (int)(end - start),
+                  MPI_DOUBLE,
+                  proc,
+                  tag,
+                  MPI_COMM_WORLD,
+                  &(A.recv_comm.req[i]));
+    }
+
+    for (int i = 0; i < A.send_comm.n_msgs; i++)
+    {
+        proc  = A.send_comm.procs[i];
+        start = A.send_comm.ptr[i];
+        end   = A.send_comm.ptr[i + 1];
+        for (int j = start; j < end; j++)
+            sendbuf[j] = x[A.send_comm.idx[j]];
+        MPI_Isend(&(sendbuf[start]),
+                  (int)(end - start),
+                  MPI_DOUBLE,
+                  proc,
+                  tag,
+                  MPI_COMM_WORLD,
+                  &(A.send_comm.req[i]));
+    }
+
     spmv_test(alpha, A, x, beta, b, recvbuf);
-    //spmv_test_reversed(alpha, A, x, beta, b, recvbuf);
 
     if (A.send_comm.n_msgs)
     {
@@ -320,15 +373,25 @@ void spmv_standard(double alpha,
     spmv(alpha, A.off_proc, comm->get_recvbuf(), 1.0, b.data());
 }
 
-std::function<void(double,ParMat&,std::vector<double>&,double,std::vector<double>&,SpMVComm*)> get_spmv(SPMV_TYPE SPMV){  
+std::function<void(double,ParMat&,std::vector<double>&,double,std::vector<double>&,SpMVComm*)> get_spmv_advance(SPMV_TYPE SPMV){  
     auto spmv = spmv_standard;
     switch(SPMV){
       case PIPE_SPMV:
         return [](double alpha,ParMat& A,std::vector<double>& x,double beta,std::vector<double>& b,SpMVComm* comm){
-            spmv_test(alpha,A,x,beta,b);
+            pipe_spmv(alpha,A,x,beta,b);
         };
       case STANDARD_SPMV:
       default:
     }
     return spmv_standard;
+}
+
+std::function<
+void (double, ParMat&, std::vector<double>&, double, std::vector<double>& )> get_spmv(SPMV_TYPE spmv_type){
+    switch(spmv_type){
+        case STANDARD_SPMV:
+            return spmv_basic;
+        case PIPE_SPMV:
+            return pipe_spmv;
+    };
 }
