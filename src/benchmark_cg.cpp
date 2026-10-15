@@ -3,7 +3,7 @@
 #include "spmv.hpp"
 #include "mat_ops.hpp"
 #include "cg_routines.hpp"
-
+#include <math.h>
 int main(int argc, char* argv[])
 {
     MPI_Init(&argc, &argv);
