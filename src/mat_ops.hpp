@@ -8,15 +8,15 @@ enum INNER_PRODUCT_TYPE{
     NON_BLOCKING_INNER_PRODUCT
 };
 
-std::function<void(std::vector<double>,
-    std::vector<double>,
+std::function<void(std::vector<double>&,
+    std::vector<double>&,
     double*,
     double*,
     MPI_Request*)> get_inner_product(INNER_PRODUCT_TYPE inner_product_type);
     
-std::function<void(std::vector<double>,
-    std::vector<double>,
-    std::vector<double>,
+std::function<void(std::vector<double>&,
+    std::vector<double>&,
+    std::vector<double>&,
     double*,
     double*,
     MPI_Request*)> get_combined_inner_product(INNER_PRODUCT_TYPE inner_product_type);
@@ -28,13 +28,13 @@ std::function<void(MPI_Request*, MPI_Status*)> get_inner_product_wait(INNER_PROD
 double inner_product(std::vector<double>& a,
                      std::vector<double>& b,
                      AllreduceComm* comm);
-double inner_product(std::vector<double> a, std::vector<double> b);
-double inner_product(std::vector<double> a, std::vector<double>b, int is, int ie);
+double inner_product(std::vector<double>& a, std::vector<double>& b);
+double inner_product(std::vector<double>& a, std::vector<double>& b, int is, int ie);
 double sparse_row_partial_inner_product(Mat& A, int rowa,int rowb,int colend );
-double sparse_row_vector_inner_product(Mat& A, int rowa, std::vector<double> x);
+double sparse_row_vector_inner_product(Mat& A, int rowa, std::vector<double>& x);
 
-void Iinner_product(std::vector<double> a, std::vector<double>b, double* sum_local, double* sum, MPI_Request* request);
-void combined_Iinner_product(std::vector<double> a, std::vector<double>b, std::vector<double>c,double* sum_local, double* sum, MPI_Request* request);
+void Iinner_product(std::vector<double>& a, std::vector<double>& b, double* sum_local, double* sum, MPI_Request* request);
+void combined_Iinner_product(std::vector<double>& a, std::vector<double>& b, std::vector<double>& c,double* sum_local, double* sum, MPI_Request* request);
 void axpy(double alpha, std::vector<double>& x, std::vector<double>& y);
 void axpy(double alpha, std::vector<double>& x, std::vector<double>& y, int is, int ie);
 void scale(double alpha, std::vector<double>& x);

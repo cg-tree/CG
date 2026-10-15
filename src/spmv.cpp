@@ -381,7 +381,7 @@ std::function<void(double,ParMat&,std::vector<double>&,double,std::vector<double
             pipe_spmv(alpha,A,x,beta,b);
         };
       case STANDARD_SPMV:
-      default:
+        return spmv_standard;
     }
     return spmv_standard;
 }

@@ -53,19 +53,18 @@ int main(int argc, char* argv[])
     /*********************************************************
      * Test Standard CG 
      ********************************************************/
-   /*
+
     if (rank == 0) 
         printf("Testing Standard CG:\n");
     auto standard_cg = get_cg(STANDARD_CG);
     // Set x to zero, test CG
     std::fill(x.begin(), x.end(), 0);
-    double t0 = MPI_Wtime();
+    t0 = MPI_Wtime();
     n_iter = standard_cg(A, x, b,max_iters,tol);
-    double t1 = MPI_Wtime();
+    t1 = MPI_Wtime();
     t1 -= t0;
     r = b;
     spmv(1.0, A, x, -1.0, r);
-    double rr_inner;
     standard_inner_product(r, r,&tmp,&rr_inner,&request);
     norm_r = sqrt(rr_inner);
     if (rank == 0) 
@@ -74,14 +73,14 @@ int main(int argc, char* argv[])
     MPI_Allreduce(&t1,&time,1,MPI_DOUBLE,MPI_MAX,MPI_COMM_WORLD);
     if (rank == 0) 
         printf("CG takes %e seconds\n", time);
-*/
+
     /*********************************************************
      * Test Preconditioned CG
      ********************************************************/
     if (rank == 0) 
         printf("Testing Preconditioned CG:\n");
 
-    auto preconditioned_cg = get_cg(PRECONDITIONED_CG);
+    auto preconditioned_cg = get_cg(PRECONDITIONED_CG,STANDARD_SPMV,STANDARD_INNER_PRODUCT);
     // Set x to zero, test CG
     std::fill(x.begin(), x.end(), 0);
     t0 = MPI_Wtime();
@@ -91,9 +90,10 @@ int main(int argc, char* argv[])
     r = b;
     spmv(1.0, A, x, -1.0, r);
     standard_inner_product(r, r,&tmp,&rr_inner,&request);
+    
     norm_r = sqrt(rr_inner);
     if (rank == 0) 
-        printf("After %d iterations, final res is %e\n", n_iter, norm_r / norm_b);
+        printf("After %d iterations, final res is %e, raw res is %e, norm_b is %e\n", n_iter, norm_r / norm_b,norm_r,norm_b);
 
 
     MPI_Allreduce(&t1,&time,1,MPI_DOUBLE,MPI_MAX,MPI_COMM_WORLD);
@@ -106,21 +106,24 @@ int main(int argc, char* argv[])
     if (rank == 0) 
         printf("Testing Pipe CG:\n");
 
-    auto pipe_cg = get_cg(PIPE_CG);
+    auto pipe_cg = get_cg(PIPE_CG,STANDARD_SPMV, STANDARD_INNER_PRODUCT);
     // Set x to zero, test CG
     std::fill(x.begin(), x.end(), 0);
     t0 = MPI_Wtime();
     n_iter = pipe_cg(A, x, b,max_iters, tol);
     t1 = MPI_Wtime();
     t1 -= t0;
-    MPI_Allreduce(&t1,&time,1,MPI_DOUBLE,MPI_MAX,MPI_COMM_WORLD);
     r = b;
     spmv(1.0, A, x, -1.0, r);
+    tmp =0;
+    rr_inner=0;
     standard_inner_product(r, r,&tmp,&rr_inner,&request);
     norm_r = sqrt(rr_inner);
     if (rank == 0) 
-        printf("After %d iterations, final res is %e\n", n_iter, norm_r / norm_b);
+        printf("After %d iterations, final res is %e, raw res is %e\n", n_iter, norm_r / norm_b,norm_r);
+        //printf("After %d iterations, final res is %e\n", n_iter, norm_r / norm_b);
 
+    MPI_Allreduce(&t1,&time,1,MPI_DOUBLE,MPI_MAX,MPI_COMM_WORLD);
 
     if (rank == 0) 
         printf("CG takes %e seconds\n", time);
@@ -143,7 +146,8 @@ int main(int argc, char* argv[])
     standard_inner_product(r, r,&tmp,&rr_inner,&request);
     norm_r = sqrt(rr_inner);
     if (rank == 0) 
-        printf("After %d iterations, final res is %e\n", n_iter, norm_r / norm_b);
+        printf("After %d iterations, final res is %e, raw res is %e\n", n_iter, norm_r / norm_b,norm_r);
+        //printf("After %d iterations, final res is %e\n", n_iter, norm_r / norm_b);
 
 
     MPI_Allreduce(&t1,&time,1,MPI_DOUBLE,MPI_MAX,MPI_COMM_WORLD);

@@ -7,7 +7,7 @@
 #include "icf.hpp"
 
 
-int set_A_equals_LLT(Mat& A, Mat& L){
+void set_A_equals_LLT(Mat& A, Mat& L){
     //set A to be LL^T because A.on_proc may be singular 
     for(int i = 0; i< A.n_rows;++i){
         int start,end;

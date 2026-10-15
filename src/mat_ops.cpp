@@ -24,7 +24,7 @@ double inner_product_advance(std::vector<double>& a,
 
 
 // Parallel Inner Product
-double inner_product(std::vector<double> a, std::vector<double> b)
+double inner_product(std::vector<double>& a, std::vector<double>& b)
 {
     double sum, sum_local;
 
@@ -38,7 +38,7 @@ double inner_product(std::vector<double> a, std::vector<double> b)
 }
 
 // Serial Inner Product
-double inner_product(std::vector<double> a, std::vector<double>b, int is, int ie)
+double inner_product(std::vector<double>& a, std::vector<double>& b, int is, int ie)
 {
     
     double sum_local = 0;
@@ -85,7 +85,7 @@ double sparse_row_partial_inner_product(Mat& A, int rowa,int rowb,int colend )
 }
 
 // innerproduct of row of sparse matrix with a vector
-double sparse_row_vector_inner_product(Mat& A, int rowa, std::vector<double> x){
+double sparse_row_vector_inner_product(Mat& A, int rowa, std::vector<double>& x){
     double sum = 0;
     int start, end;
     start = A.rowptr[rowa];
@@ -98,7 +98,7 @@ double sparse_row_vector_inner_product(Mat& A, int rowa, std::vector<double> x){
 
 // non-blocking inner product
 //double sum_local[1];
-void Iinner_product(std::vector<double> a, std::vector<double>b, double* sum_local, double* sum, MPI_Request* request)
+void Iinner_product(std::vector<double>& a, std::vector<double>& b, double* sum_local, double* sum, MPI_Request* request)
 {
     *sum_local = 0;
     for (int i = 0; i < a.size(); i++)
@@ -111,7 +111,7 @@ void Iinner_product(std::vector<double> a, std::vector<double>b, double* sum_loc
  * computes (a,c) and (b,c) with a single non-blocking allreduce
  * double sum_local[2];
  * */
-void combined_Iinner_product(std::vector<double> a, std::vector<double>b, std::vector<double>c,double* sum_local, double* sum, MPI_Request* request)
+void combined_Iinner_product(std::vector<double>& a, std::vector<double>& b, std::vector<double>& c,double* sum_local, double* sum, MPI_Request* request)
 {
 
     sum_local[0] = 0;
@@ -124,37 +124,37 @@ void combined_Iinner_product(std::vector<double> a, std::vector<double>b, std::v
     MPI_Iallreduce(sum_local, sum, 2, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD, request);
 }
 
-std::function<void(std::vector<double>,
-    std::vector<double>,
+std::function<void(std::vector<double>&,
+    std::vector<double>&,
     double*,
     double*,
     MPI_Request*)> get_inner_product(INNER_PRODUCT_TYPE inner_product_type){
     
     switch(inner_product_type){
         case STANDARD_INNER_PRODUCT:
-            return [](std::vector<double> a,
-                std::vector<double>b,
+            return [](std::vector<double>& a,
+                std::vector<double>& b,
                 double* sum_local,
                 double* sum,
                 MPI_Request* request){
-                    *sum_local = inner_product(a,b);
+                    *sum = inner_product(a,b);
             };
         case NON_BLOCKING_INNER_PRODUCT:
             return Iinner_product;
     };
 }
 
-std::function<void(std::vector<double>,
-    std::vector<double>,
-    std::vector<double>,
+std::function<void(std::vector<double>&,
+    std::vector<double>&,
+    std::vector<double>&,
     double*,
     double*,
     MPI_Request*)> get_combined_inner_product(INNER_PRODUCT_TYPE inner_product_type){
     switch(inner_product_type){
         case STANDARD_INNER_PRODUCT:
-            return [](std::vector<double> a,
-                std::vector<double>b,
-                std::vector<double>c,
+            return [](std::vector<double>& a,
+                std::vector<double>& b,
+                std::vector<double>& c,
                 double* sum_local,
                 double* sum,
                 MPI_Request* request){

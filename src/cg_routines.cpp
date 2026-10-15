@@ -262,7 +262,7 @@ int pipe_cg(SPMV_TYPE spmv_type, INNER_PRODUCT_TYPE inner_product_type, ParMat& 
 
 
 
-    int iter;
+    int iter, recompute_r;
     double alpha, alpha_last;
     double beta, delta;
     double gamma, gamma_last;
@@ -271,16 +271,13 @@ int pipe_cg(SPMV_TYPE spmv_type, INNER_PRODUCT_TYPE inner_product_type, ParMat& 
     double rr_inner;
     double norm_r;
 
-    // r0 = b - A * x0
-    //x0 = 0 so r0 = b
-    r = b;
-    
     Mat L;
     incomplete_cholesky(A,L);
-    incomplete_cholesky_solve(L,x,b);
+    //incomplete_cholesky_solve(L,x,b);
 
     // r0 = b - A * x0
-    spmv(-1.0, A, x, 0.0, r);
+    r = b;
+    spmv(-1.0, A, x, 1.0, r);
     MPI_Request rr_inner_request;
     //Iinner_product(r,r,sum_local,&rr_inner,&rrinner_request);
     inner_product(r,r,sum_local,&rr_inner,&rr_inner_request);
@@ -351,13 +348,13 @@ int pipe_cg(SPMV_TYPE spmv_type, INNER_PRODUCT_TYPE inner_product_type, ParMat& 
 
         //x_{i+1} = x_i + alpha_i p_i
         axpy(alpha, x, p);
-        //r_{i+1} = r_i - alpha_i s_i
-        axpy(-1.0*alpha, r, s);
         //u_{i+1} = u_i - alpha_i q_i
         axpy(-1.0*alpha, u, q);
         //w_{i+1} = w_i - alpha_i z_i
         axpy(-1.0*alpha, w, z);
-
+        //r_{i+1} = r_i - alpha_i s_i
+        axpy(-1.0*alpha, r, s);
+        
         //progress tracking
         norm_r = sqrt(gamma);
         res.push_back(norm_r);
