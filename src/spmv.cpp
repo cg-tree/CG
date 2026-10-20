@@ -378,6 +378,25 @@ void progress_spmv(double alpha, ParMat& A, std::vector<double>& x,
     spmv(alpha, A.off_proc, recvbuf, 1.0, b);
 }
 
+void omp_spmv(double alpha, ParMat& A, std::vector<double>& x, 
+        double beta, std::vector<double>& b){
+    std::vector<double> recvbuf(A.recv_comm.size_msgs);
+    std::vector<double> sendbuf(A.send_comm.size_msgs);
+    spmv_start_comm(A, x, b, sendbuf, recvbuf);
+    #pragma omp parallel sections
+    {
+        #pragma omp section
+        {
+            spmv(alpha, A.on_proc, x, beta, b);
+        }
+        #pragma omp section
+        {
+            spmv_wait_comm(A);
+        }
+    }
+    spmv(alpha, A.off_proc, recvbuf, 1.0, b);
+}
+
 // Serial SpMV
 void spmv(double alpha, Mat& A, double* x, double beta, double* b)
 {
@@ -445,5 +464,7 @@ void (double, ParMat&, std::vector<double>&, double, std::vector<double>& )> get
             return pipe_spmv;
         case PROGRESS_SPMV:
             return progress_spmv;
+        case OMP_SPMV:
+            return omp_spmv;
     };
 }

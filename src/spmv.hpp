@@ -16,7 +16,8 @@ void spmv(double alpha, ParMat& A, std::vector<double>& x,
 enum SPMV_TYPE{
   STANDARD_SPMV,
   PIPE_SPMV,
-  PROGRESS_SPMV
+  PROGRESS_SPMV,
+  OMP_SPMV
 };
 
 std::function<void(double,ParMat&,std::vector<double>&,double,std::vector<double>&)> get_spmv(SPMV_TYPE spmv_type);
