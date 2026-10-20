@@ -66,16 +66,35 @@ void spmv_row(int row, double alpha, Mat& A, std::vector<double>& x,
     b[row] = alpha * sum + beta * b[row];
 }
 
-//not particularly useful
-int spmv_testall(int nmsgs, MPI_Request* requests, double alpha, Mat& A,
-        std::vector<double>& x, double beta, std::vector<double>& b)
+//test for testcount messages every testperiod rows
+//can we just encourage mpi to progress our messages faster?
+void spmv_on_proc_test_some(double alpha, ParMat& PA,
+        std::vector<double>& x, double beta, std::vector<double>& b, int testcount = 1, int test_period=1)
 {
+    Mat& A = PA.on_proc;
     int test;
+    MPI_Request* sends = PA.send_comm.req.data();
+    MPI_Request* recvs = PA.recv_comm.req.data();
+    int nsendmsgs = PA.send_comm.n_msgs;
+    int nrecvmsgs = PA.recv_comm.n_msgs;
+    int sent = 0;
+    int recvd = 0;
+    int testnsends = testcount;
+    int testnrecvs = testcount;
+
+
+
     for (int i = 0; i < A.n_rows; i++){
         spmv_row(i, alpha, A, x, beta, b);
-        MPI_Testall(nmsgs, requests, &test, MPI_STATUSES_IGNORE);
+        if(i%test_period ==0){
+            MPI_Testall(testnsends, &(sends[sent]), &test, MPI_STATUSES_IGNORE);
+            sent += testnsends*test;
+            if(nsendmsgs - sent<testnsends){testnsends = nsendmsgs - sent;}
+            MPI_Testall(testnrecvs, &(recvs[recvd]), &test, MPI_STATUSES_IGNORE);
+            recvd += testnrecvs*test;
+            if(nrecvmsgs - recvd < testnrecvs){ testnrecvs = nrecvmsgs - recvd;}
+        }
     }
-    return test;
 }
 
 /* call after initiating isends and irecvs
@@ -282,15 +301,11 @@ void spmv_basic(double alpha, ParMat& A, std::vector<double>& x,
 
 }
 
-// Parallel SpMV b = alpha*A*x + beta*b
-// optimized spmv1
-void pipe_spmv(double alpha, ParMat& A, std::vector<double>& x, 
-        double beta, std::vector<double>& b)
+void spmv_start_comm(ParMat& A, std::vector<double>& x, 
+        std::vector<double>& b, std::vector<double>&sendbuf, std::vector<double>& recvbuf)
 {
     int proc, start, end;
     int tag = 0;
-    std::vector<double> recvbuf(A.recv_comm.size_msgs);
-    std::vector<double> sendbuf(A.send_comm.size_msgs);
 
     for (int i = 0; i < A.recv_comm.n_msgs; i++)
     {
@@ -321,16 +336,46 @@ void pipe_spmv(double alpha, ParMat& A, std::vector<double>& x,
                   MPI_COMM_WORLD,
                   &(A.send_comm.req[i]));
     }
+}
 
+void spmv_wait_comm(ParMat& A){
+
+    if (A.recv_comm.n_msgs)
+    {
+        MPI_Waitall(A.recv_comm.n_msgs, A.recv_comm.req.data(), MPI_STATUSES_IGNORE);
+    }
+
+    if (A.send_comm.n_msgs)
+    {
+        MPI_Waitall(A.send_comm.n_msgs, A.send_comm.req.data(), MPI_STATUSES_IGNORE);
+    }
+
+}
+// Parallel SpMV b = alpha*A*x + beta*b
+// optimized spmv1
+void pipe_spmv(double alpha, ParMat& A, std::vector<double>& x, 
+        double beta, std::vector<double>& b){
+    std::vector<double> recvbuf(A.recv_comm.size_msgs);
+    std::vector<double> sendbuf(A.send_comm.size_msgs);
+    spmv_start_comm( A,x,b,sendbuf,recvbuf);
     spmv_test(alpha, A, x, beta, b, recvbuf);
 
     if (A.send_comm.n_msgs)
     {
         MPI_Waitall(A.send_comm.n_msgs, A.send_comm.req.data(), MPI_STATUSES_IGNORE);
     }
-    
 }
 
+
+void progress_spmv(double alpha, ParMat& A, std::vector<double>& x, 
+        double beta, std::vector<double>& b){
+    std::vector<double> recvbuf(A.recv_comm.size_msgs);
+    std::vector<double> sendbuf(A.send_comm.size_msgs);
+    spmv_start_comm(A, x, b, sendbuf, recvbuf);
+    spmv_on_proc_test_some(alpha, A, x, beta, b, 3, 1);
+    spmv_wait_comm(A);
+    spmv(alpha, A.off_proc, recvbuf, 1.0, b);
+}
 
 // Serial SpMV
 void spmv(double alpha, Mat& A, double* x, double beta, double* b)
@@ -380,6 +425,10 @@ std::function<void(double,ParMat&,std::vector<double>&,double,std::vector<double
         return [](double alpha,ParMat& A,std::vector<double>& x,double beta,std::vector<double>& b,SpMVComm* comm){
             pipe_spmv(alpha,A,x,beta,b);
         };
+      case PROGRESS_SPMV:
+        return [](double alpha,ParMat& A,std::vector<double>& x,double beta,std::vector<double>& b,SpMVComm* comm){
+            progress_spmv(alpha,A,x,beta,b);
+        };
       case STANDARD_SPMV:
         return spmv_standard;
     }
@@ -393,5 +442,7 @@ void (double, ParMat&, std::vector<double>&, double, std::vector<double>& )> get
             return spmv_basic;
         case PIPE_SPMV:
             return pipe_spmv;
+        case PROGRESS_SPMV:
+            return progress_spmv;
     };
 }

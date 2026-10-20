@@ -155,12 +155,12 @@ int main(int argc, char* argv[])
         printf("CG takes %e seconds\n", time);
 
     /*********************************************************
-     * Test Pipe CG with Pipe-SPMV and standard inner product
+     * Test Pipe CG with PROGRESS_SPMV and standard inner product
      ********************************************************/
     if (rank == 0)
-        printf("Testing Pipe CG with Pipe-SPMV:\n");
+        printf("Testing Pipe CG with PROGRESS_SPMV:\n");
 
-    pipe_cg = get_cg(PIPE_CG,PIPE_SPMV,STANDARD_INNER_PRODUCT);
+    pipe_cg = get_cg(PIPE_CG,PROGRESS_SPMV,STANDARD_INNER_PRODUCT);
     // Set x to zero, test CG
     std::fill(x.begin(), x.end(), 0);
     t0 = MPI_Wtime();
@@ -181,12 +181,12 @@ int main(int argc, char* argv[])
         printf("CG takes %e seconds\n", time);
 
     /*********************************************************
-     * Test Pipe CG with Pipe-SPMV and NON_BLOCKING inner product
+     * Test Pipe CG with PROGRESS_SPMV and NON_BLOCKING inner product
      ********************************************************/
     if (rank == 0)
-        printf("Testing Pipe CG with Pipe-SPMV and NON_BLOCKING_INNER_PRODUCT:\n");
+        printf("Testing Pipe CG with PROGRESS_SPMV and NON_BLOCKING_INNER_PRODUCT:\n");
 
-    pipe_cg = get_cg(PIPE_CG,PIPE_SPMV,NON_BLOCKING_INNER_PRODUCT);
+    pipe_cg = get_cg(PIPE_CG,PROGRESS_SPMV,NON_BLOCKING_INNER_PRODUCT);
     // Set x to zero, test CG
     std::fill(x.begin(), x.end(), 0);
     t0 = MPI_Wtime();
