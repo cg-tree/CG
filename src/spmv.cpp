@@ -68,7 +68,7 @@ void spmv_row(int row, double alpha, Mat& A, std::vector<double>& x,
 
 //test for testcount messages every testperiod rows
 //can we just encourage mpi to progress our messages faster?
-void spmv_on_proc_test_some(double alpha, ParMat& PA,
+int spmv_on_proc_test_some(double alpha, ParMat& PA,
         std::vector<double>& x, double beta, std::vector<double>& b, int testcount = 1, int test_period=1)
 {
     Mat& A = PA.on_proc;
@@ -87,14 +87,15 @@ void spmv_on_proc_test_some(double alpha, ParMat& PA,
     for (int i = 0; i < A.n_rows; i++){
         spmv_row(i, alpha, A, x, beta, b);
         if(i%test_period ==0){
+            if(nsendmsgs - sent<testnsends){testnsends = nsendmsgs - sent;}
             MPI_Testall(testnsends, &(sends[sent]), &test, MPI_STATUSES_IGNORE);
             sent += testnsends*test;
-            if(nsendmsgs - sent<testnsends){testnsends = nsendmsgs - sent;}
+            if(nrecvmsgs - recvd < testnrecvs){ testnrecvs = nrecvmsgs - recvd;}
             MPI_Testall(testnrecvs, &(recvs[recvd]), &test, MPI_STATUSES_IGNORE);
             recvd += testnrecvs*test;
-            if(nrecvmsgs - recvd < testnrecvs){ testnrecvs = nrecvmsgs - recvd;}
         }
     }
+    return (sent==nsendmsgs) && (recvd==nrecvmsgs);
 }
 
 /* call after initiating isends and irecvs
@@ -372,8 +373,8 @@ void progress_spmv(double alpha, ParMat& A, std::vector<double>& x,
     std::vector<double> recvbuf(A.recv_comm.size_msgs);
     std::vector<double> sendbuf(A.send_comm.size_msgs);
     spmv_start_comm(A, x, b, sendbuf, recvbuf);
-    spmv_on_proc_test_some(alpha, A, x, beta, b, 3, 1);
-    spmv_wait_comm(A);
+    int completed = spmv_on_proc_test_some(alpha, A, x, beta, b, 4, 4);
+    if(!completed){ spmv_wait_comm(A); }
     spmv(alpha, A.off_proc, recvbuf, 1.0, b);
 }
 
