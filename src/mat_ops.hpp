@@ -21,7 +21,9 @@ std::function<void(std::vector<double>&,
     double*,
     MPI_Request*)> get_combined_inner_product(INNER_PRODUCT_TYPE inner_product_type);
 
-std::function<double(std::vector<double>&, std::vector<double>&, AllreduceComm*)> get_inner_product_advance();
+std::function<double(std::vector<double>&,
+    std::vector<double>&,
+    AllreduceComm*)> get_inner_product_advance(INNER_PRODUCT_TYPE inner_product_type);
 
 std::function<void(MPI_Request*, MPI_Status*)> get_inner_product_wait(INNER_PRODUCT_TYPE inner_product_type);
 

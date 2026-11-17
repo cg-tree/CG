@@ -21,7 +21,7 @@ class AllreduceCommPers : public AllreduceComm
             local_sum = loc;
             global_sum = glob;
 
-            MPI_Allreduce_init(local_sum, global_sum, 1, MPI_DOUBLE, MPI_SUM,
+            MPI_Allreduce_init(local_sum, global_sum, count, MPI_DOUBLE, MPI_SUM,
                     MPI_COMM_WORLD, MPI_INFO_NULL, &req);
         }
 

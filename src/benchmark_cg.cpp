@@ -232,6 +232,33 @@ int main(int argc, char* argv[])
     if (rank == 0) 
         printf("CG takes %e seconds\n", time);
 
+
+    /*********************************************************
+     * Test Pipe CG with PROGRESS_SPMV and NON_BLOCKING inner product and PERSISTENT_SPMV and PERSISTENT_ALLREDUCE
+     ********************************************************/
+    if (rank == 0)
+        printf("Testing Pipe CG with PROGRESS_SPMV and NON_BLOCKING_INNER_PRODUCT and PERSISTENT_SPMV_COMM and PERSISTENT_ALLREDUCE_COMM:\n");
+
+    pipe_cg = get_cg(PIPE_CG,PROGRESS_SPMV,NON_BLOCKING_INNER_PRODUCT,PERSISTENT_SPMV_COMM,PERSISTENT_ALLREDUCE_COMM);
+    // Set x to zero, test CG
+    std::fill(x.begin(), x.end(), 0);
+    t0 = MPI_Wtime();
+    n_iter = pipe_cg(A, x, b,max_iters,tol);
+    t1 = MPI_Wtime();
+    t1 -= t0;
+    r = b;
+    spmv(1.0, A, x, -1.0, r);
+    standard_inner_product(r, r,&tmp,&rr_inner,&request);
+    norm_r = sqrt(rr_inner);
+    if (rank == 0) 
+        printf("After %d iterations, final res is %e, raw res is %e\n", n_iter, norm_r / norm_b,norm_r);
+        //printf("After %d iterations, final res is %e\n", n_iter, norm_r / norm_b);
+
+
+    MPI_Allreduce(&t1,&time,1,MPI_DOUBLE,MPI_MAX,MPI_COMM_WORLD);
+    if (rank == 0) 
+        printf("CG takes %e seconds\n", time);
+
     MPI_Finalize();
 
     return 0;

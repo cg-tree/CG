@@ -68,8 +68,13 @@ void spmv_row(int row, double alpha, Mat& A, std::vector<double>& x,
 
 //test for testcount messages every testperiod rows
 //can we just encourage mpi to progress our messages faster?
-int spmv_on_proc_test_some(double alpha, ParMat& PA,
-        std::vector<double>& x, double beta, std::vector<double>& b, int testcount = 1, int test_period=1)
+int spmv_on_proc_test_some(double alpha,
+        ParMat& PA,
+        std::vector<double>& x,
+        double beta,
+        std::vector<double>& b,
+        int testcount = 1,
+        int test_period=1)
 {
     Mat& A = PA.on_proc;
     int test;
@@ -354,11 +359,17 @@ void spmv_wait_comm(ParMat& A){
 }
 // Parallel SpMV b = alpha*A*x + beta*b
 // optimized spmv1
-void pipe_spmv(double alpha, ParMat& A, std::vector<double>& x, 
-        double beta, std::vector<double>& b){
+void pipe_spmv(double alpha,
+        ParMat& A,
+        std::vector<double>& x, 
+        double beta,
+        std::vector<double>& b){
+    
     std::vector<double> recvbuf(A.recv_comm.size_msgs);
     std::vector<double> sendbuf(A.send_comm.size_msgs);
+    
     spmv_start_comm( A,x,b,sendbuf,recvbuf);
+    
     spmv_test(alpha, A, x, beta, b, recvbuf);
 
     if (A.send_comm.n_msgs)
@@ -368,15 +379,25 @@ void pipe_spmv(double alpha, ParMat& A, std::vector<double>& x,
 }
 
 
-void progress_spmv(double alpha, ParMat& A, std::vector<double>& x, 
-        double beta, std::vector<double>& b){
+void progress_spmv(double alpha,
+        ParMat& A,
+        std::vector<double>& x,
+        double beta,
+        std::vector<double>& b){
+    
     std::vector<double> recvbuf(A.recv_comm.size_msgs);
     std::vector<double> sendbuf(A.send_comm.size_msgs);
+
     spmv_start_comm(A, x, b, sendbuf, recvbuf);
+    
     int completed = spmv_on_proc_test_some(alpha, A, x, beta, b, 4, 4);
+    
     if(!completed){ spmv_wait_comm(A); }
+    
     spmv(alpha, A.off_proc, recvbuf, 1.0, b);
 }
+
+    
 
 void omp_spmv(double alpha, ParMat& A, std::vector<double>& x, 
         double beta, std::vector<double>& b){
@@ -424,8 +445,6 @@ void spmv_standard(double alpha,
           std::vector<double>& b,
           SpMVComm* comm)
 {
-    int proc, start, end;
-    int tag = 0;
 
     comm->pack(x);
 
@@ -438,6 +457,56 @@ void spmv_standard(double alpha,
     spmv(alpha, A.off_proc, comm->get_recvbuf(), 1.0, b.data());
 }
 
+void progress_spmv_advance(double alpha,
+        ParMat& A,
+        std::vector<double>& x,
+        double beta,
+        std::vector<double>& b,
+        SpMVComm* comm){
+
+    int test_count = 4;
+    int test_freq = 4;
+    comm->pack(x);
+
+    comm->start();
+    for (int i = 0; i < A.on_proc.n_rows; i++){
+        spmv_row(i, alpha, A.on_proc, x, beta, b);
+        if(i%test_freq == 0){
+            comm->test_n_sends(test_count);
+            comm->test_n_recvs(test_count);
+        }
+    }
+    if(!comm->done()){
+        comm->wait();
+    }
+    spmv(alpha, A.off_proc, comm->get_recvbuf(), 1.0, b.data());
+}
+void omp_spmv_advance(double alpha,
+          ParMat& A,
+          std::vector<double>& x,
+          double beta,
+          std::vector<double>& b,
+          SpMVComm* comm)
+{
+
+    #pragma omp parallel sections
+    {
+        #pragma omp section
+        {
+            comm->pack(x);
+
+            comm->start();
+    
+            comm->wait();
+        }
+        #pragma omp section
+        {
+            spmv(alpha, A.on_proc, x.data(), beta, b.data());
+        }
+    }
+    spmv(alpha, A.off_proc, comm->get_recvbuf(), 1.0, b.data());
+}
+
 std::function<void(double,ParMat&,std::vector<double>&,double,std::vector<double>&,SpMVComm*)> get_spmv_advance(SPMV_TYPE SPMV){  
     auto spmv = spmv_standard;
     switch(SPMV){
@@ -446,11 +515,13 @@ std::function<void(double,ParMat&,std::vector<double>&,double,std::vector<double
             pipe_spmv(alpha,A,x,beta,b);
         };
       case PROGRESS_SPMV:
-        return [](double alpha,ParMat& A,std::vector<double>& x,double beta,std::vector<double>& b,SpMVComm* comm){
-            progress_spmv(alpha,A,x,beta,b);
-        };
+        return progress_spmv_advance;
+      
       case STANDARD_SPMV:
         return spmv_standard;
+
+      case OMP_SPMV:
+        return omp_spmv_advance;
     }
     return spmv_standard;
 }

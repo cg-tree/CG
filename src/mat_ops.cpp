@@ -175,7 +175,7 @@ std::function<void(MPI_Request*, MPI_Status*)> get_inner_product_wait(INNER_PROD
     }
 }
 
-std::function<double(std::vector<double>&, std::vector<double>&, AllreduceComm*)> get_inner_product_advance(){
+std::function<double(std::vector<double>&, std::vector<double>&, AllreduceComm*)> get_inner_product_advance(INNER_PRODUCT_TYPE inner_product_type){
     return inner_product_advance;
 }
 

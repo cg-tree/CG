@@ -23,7 +23,7 @@ class AllreduceCommMPIL : public AllreduceComm
 
         void start()
         {
-            MPIL_Allreduce(local_sum, global_sum, 1, MPI_DOUBLE, MPI_SUM, 
+            MPIL_Allreduce(local_sum, global_sum, count, MPI_DOUBLE, MPI_SUM, 
                     MPIL_COMM_WORLD);        
         }
 

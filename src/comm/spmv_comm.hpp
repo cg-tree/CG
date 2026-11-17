@@ -2,7 +2,7 @@
 #define SPMV_COMM_HPP
 
 #include "mpi.h"
-
+#include "../par_binary_IO.hpp"
 class SpMVComm
 {
     public:
@@ -13,6 +13,8 @@ class SpMVComm
             recvbuf = NULL;
             spmv_req = NULL;
             n = 0;
+            completed_sends = 0;
+            completed_recvs = 0;
         }
 
         ~SpMVComm()
@@ -38,6 +40,9 @@ class SpMVComm
             {
                 sendbuf[i] = x[A->send_comm.idx[i]];
             }
+            //put these here because this method is not overridden by children
+            completed_sends = 0;
+            completed_recvs = 0;
         }
 
         void start()
@@ -90,13 +95,37 @@ class SpMVComm
             return recvbuf;
         }
 
+        int test_n_sends(int test_count){
+            int offset = A->recv_comm.n_msgs;
+            int test = 0;
+            int remainder = A->send_comm.n_msgs - completed_sends;
+            int use_remainder = test_count>remainder;
+            test_count = (!use_remainder)*test_count + use_remainder * remainder;
+            MPI_Testall(test_count, &(spmv_req[offset + completed_sends]), &test, MPI_STATUSES_IGNORE);
+            completed_sends += test*n;
+            return test;
+        }
+        int test_n_recvs(int test_count){
+            int test = 0;
+            int remainder = A->recv_comm.n_msgs - completed_recvs;
+            int use_remainder = test_count>remainder;
+            test_count = (!use_remainder)*test_count + use_remainder * remainder;
+            MPI_Testall(test_count, &(spmv_req[completed_recvs]), &test, MPI_STATUSES_IGNORE);
+            completed_recvs += test*n;
+            return test;
+        }
+        int get_completed_sends(){return completed_sends;}
+        int get_completed_recvs(){return completed_sends;}
+        int done(){return (completed_sends+completed_recvs) == n;}
 
     protected:
         double* sendbuf;
         double* recvbuf;
         int n;
         ParMat* A;
-
+        int completed_sends;
+        int completed_recvs;
+        
     private:
         MPI_Request* spmv_req;
 };

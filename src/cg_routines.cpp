@@ -131,14 +131,23 @@ int preconditioned_cg(SPMV_TYPE spmv_type, INNER_PRODUCT_TYPE inner_product_type
     return iter;
 }
 
-int standard_cg(SPMV_TYPE spmv_type, INNER_PRODUCT_TYPE inner_product_type, ParMat& A, 
+int standard_cg(SPMV_TYPE spmv_type, INNER_PRODUCT_TYPE inner_product_type,
+        SPMV_COMM_TYPE spmv_comm_type, ALLREDUCE_COMM_TYPE allreduce_comm_type,
+        ParMat& A, 
         std::vector<double>& x, 
         std::vector<double>& b, 
         int max_iters = 500,
         double tol = 1e-06)
 {
+    // Setup persistent allreduces
+    double local_sum, global_sum;
+    //SpMVComm* spmv_comm = new SpMVComm();
+    SpMVComm* spmv_comm = get_spmv_comm(spmv_comm_type);
+    //AllreduceComm* allreduce_comm = new AllreduceComm();
+    AllreduceComm* allreduce_comm = get_allreduce_comm(allreduce_comm_type);
+
     auto spmv = get_spmv_advance(spmv_type);
-    auto inner_product = get_inner_product_advance();
+    auto inner_product = get_inner_product_advance(inner_product_type);
 
     int rank, num_procs;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -150,11 +159,6 @@ int standard_cg(SPMV_TYPE spmv_type, INNER_PRODUCT_TYPE inner_product_type, ParM
     std::vector<double> Ap(A.local_rows);
     std::vector<double> recvbuf(A.recv_comm.size_msgs);
     std::vector<double> sendbuf(A.send_comm.size_msgs);
-
-    // Setup persistent allreduces
-    double local_sum, global_sum;
-    SpMVComm* spmv_comm = new SpMVComm();
-    AllreduceComm* allreduce_comm = new AllreduceComm();
 
     spmv_comm->init(A, sendbuf.data(), recvbuf.data());
     allreduce_comm->init(&local_sum, &global_sum);
@@ -395,11 +399,16 @@ std::function<int(ParMat&,
         std::vector<double>&, 
         std::vector<double>&, 
         int,
-        double)> get_cg( CG_TYPE cg_type, SPMV_TYPE spmv_type, INNER_PRODUCT_TYPE inner_product_type){
+        double)> get_cg( CG_TYPE cg_type,
+          SPMV_TYPE spmv_type,
+          INNER_PRODUCT_TYPE inner_product_type,
+          SPMV_COMM_TYPE spmv_comm_type,
+          ALLREDUCE_COMM_TYPE allreduce_comm_type){
     switch(cg_type){
         
       case STANDARD_CG:
-            return std::bind(standard_cg, spmv_type, inner_product_type, std::placeholders::_1,std::placeholders::_2,std::placeholders::_3,std::placeholders::_4,std::placeholders::_5);
+            return std::bind(standard_cg, spmv_type, inner_product_type, spmv_comm_type, allreduce_comm_type,
+                std::placeholders::_1,std::placeholders::_2,std::placeholders::_3,std::placeholders::_4,std::placeholders::_5);
         
         case PRECONDITIONED_CG:
             return std::bind(preconditioned_cg, spmv_type, inner_product_type, std::placeholders::_1,std::placeholders::_2,std::placeholders::_3,std::placeholders::_4,std::placeholders::_5);

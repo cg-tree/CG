@@ -9,5 +9,9 @@ std::function<int(ParMat&,
         std::vector<double>&, 
         std::vector<double>&, 
         int,
-        double)> get_cg( CG_TYPE cg_type, SPMV_TYPE spmv_type=STANDARD_SPMV, INNER_PRODUCT_TYPE inner_product_type=STANDARD_INNER_PRODUCT );
+        double)> get_cg( CG_TYPE cg_type,
+          SPMV_TYPE spmv_type=STANDARD_SPMV,
+          INNER_PRODUCT_TYPE inner_product_type=STANDARD_INNER_PRODUCT,
+          SPMV_COMM_TYPE spmv_comm_type=STANDARD_SPMV_COMM,
+          ALLREDUCE_COMM_TYPE allreduce_comm_type=STANDARD_ALLREDUCE_COMM);
 #endif //CG_ROUTINES_HPP
